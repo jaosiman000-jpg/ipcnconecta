@@ -1,0 +1,41 @@
+{
+  "name": "ipcn-conecta",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:vercel": "vercel dev",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check:pwa": "node scripts/check-pwa.mjs",
+    "check": "npm run test && npm run build && npm run check:pwa"
+  },
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "firebase": "^12.5.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "firebase-tools": "^15.34.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.6",
+    "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6",
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  }
+}

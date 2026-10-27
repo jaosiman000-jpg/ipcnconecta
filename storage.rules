@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function activeUser() {
+      return signedIn() && profile().status == 'ativo' && profile().emailVerified == true;
+    }
+
+    function hasRole(roles) {
+      return activeUser() && profile().roles.hasAny(roles);
+    }
+
+    function validUpload() {
+      return request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document|image/jpeg|image/png|image/webp');
+    }
+
+    match /members/{memberId}/{fileName} {
+      allow read: if hasRole(['administrador', 'conselho']);
+      allow create, update: if hasRole(['administrador', 'conselho']) && validUpload();
+      allow delete: if hasRole(['administrador', 'conselho']);
+    }
+
+    match /finance/{entryId}/{fileName} {
+      allow read: if hasRole(['administrador', 'conselho', 'tesouraria']);
+      allow create, update: if hasRole(['administrador', 'conselho', 'tesouraria']) && validUpload();
+      allow delete: if hasRole(['administrador', 'conselho', 'tesouraria']);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

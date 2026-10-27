@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+.DS_Store
+.env
+.env.*
+!.env.example
+.firebase/
+.vercel/
+firebase-debug.log
+*-debug.log
+
+# Referências visuais e arquivos-fonte mantidos apenas na máquina local.
+DESIGN SISTEMA EXEMPLO *.jpg
+EXEMPLO DESIGN CELULAR *.jpg
+PALETA DE CORES EXEMPLO.jpg
+LOGO IPB 1.png
+LOGO IPB 2.jpeg
+LOGO IPB CIDADE NOBRE (MINHA IGREJA).PNG

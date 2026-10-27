@@ -1,11 +1,11 @@
-const CACHE_NAME = 'ipcn-conecta-shell-v2'
+const CACHE_NAME = 'ipcn-conecta-shell-v3'
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
   '/ipcn-logo.png',
-  '/icons/ipcn-192.png',
-  '/icons/ipcn-512.png',
-  '/icons/apple-touch-icon.png',
+  '/icons/ipcn-192.png?v=3',
+  '/icons/ipcn-512.png?v=3',
+  '/icons/apple-touch-icon.png?v=3',
 ]
 
 self.addEventListener('install', (event) => {

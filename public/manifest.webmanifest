@@ -11,13 +11,13 @@
   "theme_color": "#06221A",
   "icons": [
     {
-      "src": "/icons/ipcn-192.png",
+      "src": "/icons/ipcn-192.png?v=3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/ipcn-512.png",
+      "src": "/icons/ipcn-512.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

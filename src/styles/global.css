@@ -424,10 +424,11 @@ fieldset legend { padding: 0 6px; color: #34443d; font-size: .78rem; font-weight
   .menu-backdrop { position: fixed; inset: 0; z-index: 25; display: block; visibility: hidden; border: 0; background: rgba(3,22,15,.5); opacity: 0; transition: opacity .2s, visibility .2s; }
   .menu-backdrop.visible { visibility: visible; opacity: 1; }
   .app-main { width: 100%; margin-left: 0; }
-  .topbar { position: sticky; top: 0; z-index: 20; justify-content: space-between; height: 62px; padding: 0 18px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.94); }
+  .topbar { position: sticky; top: 0; z-index: 20; justify-content: flex-start; height: 62px; padding: 0 18px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.94); }
   .mobile-menu { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 9px; color: var(--deep); background: transparent; }
-  .mobile-brand { display: flex; align-items: center; gap: 8px; font-size: .82rem; }
+  .mobile-brand { position: absolute; left: 50%; display: flex; align-items: center; gap: 8px; transform: translateX(-50%); font-size: .82rem; white-space: nowrap; }
   .mobile-brand img { width: 34px; height: 34px; border-radius: 50%; object-fit: contain; }
+  .connection { margin-left: auto; }
   .connection span { width: 10px; height: 10px; }
   .page { padding: 26px 18px 44px; }
   .login-page { grid-template-columns: 1fr; }

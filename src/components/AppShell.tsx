@@ -52,7 +52,7 @@ export function AppShell() {
       <button className={`menu-backdrop ${menuOpen ? 'visible' : ''}`} aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <div className="brand">
-          <img src="/icons/ipcn-192.png?v=2" alt="Igreja Presbiteriana Cidade Nobre" />
+          <img src="/icons/ipcn-192.png?v=3" alt="Igreja Presbiteriana Cidade Nobre" />
           <strong>IPCN Conecta</strong>
           <button className="sidebar-close" type="button" onClick={() => setMenuOpen(false)} aria-label="Fechar menu"><X size={22} /></button>
         </div>
@@ -71,7 +71,7 @@ export function AppShell() {
       <div className="app-main">
         <header className="topbar">
           <button className="mobile-menu" type="button" onClick={() => setMenuOpen(true)} aria-label="Abrir menu"><Menu size={23} /></button>
-          <div className="mobile-brand"><img src="/icons/ipcn-192.png?v=2" alt="" /><strong>IPCN Conecta</strong></div>
+          <div className="mobile-brand"><img src="/icons/ipcn-192.png?v=3" alt="" /><strong>IPCN Conecta</strong></div>
           <div className={`connection ${online ? 'online' : 'offline'}`} role="status" aria-label={online ? 'Online' : 'Offline'}><span />{!online && 'Offline'}</div>
         </header>
         <main><Outlet /></main>

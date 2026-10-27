@@ -30,7 +30,12 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 - Cabeçalhos de segurança na Vercel e auditoria de dependências sem vulnerabilidades conhecidas.
 - Service Worker limitado ao shell estático; APIs e respostas externas do Firebase não entram no cache PWA.
 - CI público sem segredos: arquivos `.env`, configurações locais da Vercel e logs são ignorados pelo Git.
-- Vercel Function inicial de diagnóstico sem acesso a dados pessoais.
+- Escritas administrativas centralizadas em Vercel Function com token Firebase obrigatório, e-mail verificado, conta ativa e autorização por papel e escopo.
+- Contratos de entrada estritos, limite de 512 KB por mutação e rejeição de campos inesperados.
+- Auditoria gerada no servidor, sem aceitar identidade do autor enviada pelo navegador.
+- Federação OIDC entre Vercel e Google Cloud: tokens curtos substituem arquivos JSON com chaves privadas permanentes.
+- Conta de serviço dedicada com somente os papéis necessários para Firestore e consulta ao Firebase Authentication.
+- Logs da Function registram identificadores técnicos e o tipo da operação, sem nomes, e-mails, telefones ou conteúdo pastoral.
 
 ## Pendências operacionais
 
@@ -39,6 +44,6 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 - Publicar o aviso de privacidade completo com identificação do controlador e contato responsável.
 - Definir processo de correção, exportação, anonimização e eliminação quando legalmente aplicável.
 - Definir resposta a incidentes e revisão periódica dos acessos.
-- Migrar operações administrativas sensíveis para Vercel Functions quando as credenciais de servidor forem provisionadas com menor privilégio.
+- Validar a federação OIDC em um deploy controlado antes de publicar as regras que bloqueiam escritas administrativas diretas do navegador.
 
 Os módulos administrativos usam o Firestore em tempo real. Enquanto o Firebase Storage não for ativado, documentos e comprovantes não poderão ser enviados.

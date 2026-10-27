@@ -9,9 +9,11 @@ interface ImageSize {
   height: number
 }
 
-export function ProfilePhotoField({ onChange, resetKey }: {
+export function ProfilePhotoField({ onChange, resetKey, initialPhoto, required = true }: {
   onChange: (selection: ProfilePhotoSelection | null) => void
   resetKey: string | number | boolean
+  initialPhoto?: string
+  required?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null)
@@ -111,7 +113,7 @@ export function ProfilePhotoField({ onChange, resetKey }: {
 
   return (
     <div className="field profile-photo-field">
-      <span>Foto de perfil *</span>
+      <span>Foto de perfil{required ? ' *' : ''}</span>
       <div className="profile-photo-editor">
         <div className="profile-photo-shell">
           <div
@@ -120,17 +122,17 @@ export function ProfilePhotoField({ onChange, resetKey }: {
             onPointerMove={drag}
             onPointerUp={() => { dragRef.current = null }}
             onPointerCancel={() => { dragRef.current = null }}
-            aria-label={file ? 'Prévia da foto. Arraste para ajustar o enquadramento.' : 'Nenhuma foto selecionada'}
+            aria-label={file ? 'Prévia da foto. Arraste para ajustar o enquadramento.' : initialPhoto ? 'Foto de perfil atual' : 'Nenhuma foto selecionada'}
           >
-            {previewUrl ? <img src={previewUrl} alt="Prévia da foto de perfil" draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} onError={previewFailed} style={imageSize ? { width: imageSize.width * scale, height: imageSize.height * scale, left: `calc(50% + ${offset.x}px)`, top: `calc(50% + ${offset.y}px)` } : undefined} /> : <UserRound size={52} aria-hidden="true" />}
+            {previewUrl ? <img src={previewUrl} alt="Prévia da foto de perfil" draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} onError={previewFailed} style={imageSize ? { width: imageSize.width * scale, height: imageSize.height * scale, left: `calc(50% + ${offset.x}px)`, top: `calc(50% + ${offset.y}px)` } : undefined} /> : initialPhoto ? <img className="profile-photo-current" src={initialPhoto} alt="Foto de perfil atual" draggable={false} /> : <UserRound size={52} aria-hidden="true" />}
           </div>
           <span className="profile-photo-camera"><Camera size={17} aria-hidden="true" /></span>
         </div>
         <div className="profile-photo-controls">
           <input ref={inputRef} className="sr-only" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" onChange={choosePhoto} aria-label="Escolher foto de perfil" />
-          <button className="button secondary small" type="button" onClick={() => inputRef.current?.click()}><Camera size={17} />{file ? 'Trocar foto' : 'Escolher foto'}</button>
+          <button className="button secondary small" type="button" onClick={() => inputRef.current?.click()}><Camera size={17} />{file || initialPhoto ? 'Trocar foto' : 'Escolher foto'}</button>
           {file && <label className="profile-photo-zoom"><span>Zoom</span><span className="profile-photo-slider"><Minus size={15} aria-hidden="true" /><input type="range" min="1" max="3" step="0.05" value={zoom} onChange={(event) => updateZoom(Number(event.target.value))} aria-label="Zoom da foto" /><Plus size={15} aria-hidden="true" /></span></label>}
-          <small>{file ? 'Arraste a imagem para ajustar o enquadramento.' : 'JPG, PNG, WebP ou imagem do celular, até 12 MB.'}</small>
+          <small>{file ? 'Arraste a imagem para ajustar o enquadramento.' : initialPhoto ? 'Escolha outra imagem para substituir a foto atual.' : 'JPG, PNG, WebP ou imagem do celular, até 12 MB.'}</small>
           {error && <small className="profile-photo-error" role="alert">{error}</small>}
         </div>
       </div>

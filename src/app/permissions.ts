@@ -18,6 +18,7 @@ export type Capability =
   | 'reports.view'
   | 'users.manage'
   | 'audit.view'
+  | 'settings.view'
   | 'settings.manage'
 
 const allCapabilities: Capability[] = [
@@ -38,6 +39,7 @@ const allCapabilities: Capability[] = [
   'reports.view',
   'users.manage',
   'audit.view',
+  'settings.view',
   'settings.manage',
 ]
 
@@ -60,12 +62,12 @@ const roleCapabilities: Record<Role, Capability[]> = {
   conselho: allCapabilities,
   secretaria: [
     'dashboard.view', 'members.view', 'members.manage', 'visitors.view', 'visitors.manage',
-    'ebd.view', 'ebd.manage', 'societies.view', 'reports.view',
+    'ebd.view', 'ebd.manage', 'societies.view', 'reports.view', 'settings.view',
   ],
-  tesouraria: ['dashboard.view', 'finance.view', 'finance.manage', 'reports.view'],
-  professor: ['dashboard.view', 'ebd.view', 'ebd.attendance'],
-  lider: ['dashboard.view', 'societies.view', 'societies.request'],
-  acolhimento: ['dashboard.view', 'visitors.view', 'visitors.manage'],
+  tesouraria: ['dashboard.view', 'finance.view', 'finance.manage', 'reports.view', 'settings.view'],
+  professor: ['dashboard.view', 'ebd.view', 'ebd.attendance', 'settings.view'],
+  lider: ['dashboard.view', 'societies.view', 'societies.request', 'settings.view'],
+  acolhimento: ['dashboard.view', 'visitors.view', 'visitors.manage', 'settings.view'],
 }
 
 export function hasCapability(user: User | undefined, capability: Capability) {

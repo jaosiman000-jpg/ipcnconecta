@@ -5,8 +5,11 @@
 ```mermaid
 flowchart LR
   PWA[React PWA] --> AUTH[Firebase Authentication]
-  PWA --> DB[Cloud Firestore]
-  PWA --> API[Vercel Functions]
+  PWA -->|leituras em tempo real| DB[Cloud Firestore]
+  PWA -->|token Firebase + mutação| API[Vercel Functions]
+  API -->|OIDC federado| GCP[Conta de serviço Google Cloud]
+  GCP -->|escritas validadas| DB
+  GCP -->|verificação de conta| AUTH
   PWA -. após ativação .-> FILES[Firebase Storage]
   GH[GitHub] --> CI[GitHub Actions]
   GH --> VERCEL[Vercel Deployments]
@@ -19,8 +22,9 @@ flowchart LR
 - React/Vite: interface, navegação e controles visuais por permissão.
 - Firebase Authentication: criação de conta, login, verificação de e-mail e recuperação de senha.
 - Cloud Firestore: persistência e sincronização em tempo real.
-- Firestore Rules: autorização efetiva por papel e escopo; a interface não é a única proteção.
-- Vercel Functions: endpoints HTTP que precisam executar no servidor. A primeira rota é `GET /api/health`.
+- Firestore Rules: autorização de leitura por papel e escopo e bloqueio das escritas administrativas do navegador.
+- Vercel Functions: `GET /api/health` para diagnóstico e `POST /api/mutations` para escritas autenticadas, autorizadas, validadas e auditadas.
+- Workload Identity Federation: entrega à Function acesso temporário de menor privilégio, sem chave privada armazenada na Vercel ou no Git.
 - Firebase Storage: documentos e comprovantes, ainda desativado até existir um bucket com regras publicadas.
 - Service Worker: cache exclusivo do shell estático; não intercepta `/api` nem serviços externos do Firebase.
 
@@ -50,4 +54,8 @@ Administrador e Conselho são superusuários. Secretaria, Tesouraria, Professor,
 
 ## Decisão de backend
 
-Não há um servidor tradicional separado. Vercel Functions é o backend HTTP e escala sob demanda. Firebase continua como backend de autenticação e dados em tempo real. Novas operações privilegiadas devem entrar em Functions somente quando houver validação do token Firebase, autorização no servidor e credenciais protegidas na Vercel.
+Não há um servidor tradicional separado. Vercel Functions é o backend HTTP e escala sob demanda. Firebase continua como backend de autenticação, leituras em tempo real e arquivos.
+
+O navegador pode criar o próprio perfil pendente e sincronizar a confirmação do próprio e-mail. Todas as outras escritas passam por `POST /api/mutations`. A Function valida o token Firebase, recarrega o perfil no Firestore, confere papel e escopo, valida o contrato da operação e grava o evento de auditoria no mesmo lote ou transação.
+
+O procedimento de provisionamento e a ordem segura de publicação estão em [SECURE_FUNCTIONS.md](SECURE_FUNCTIONS.md).

@@ -20,6 +20,15 @@ describe('permissões cumulativas', () => {
     expect(hasCapability(combined, 'finance.view')).toBe(false)
   })
 
+  it('permite que todos consultem o próprio perfil sem liberar configurações administrativas', () => {
+    const roles: User['roles'] = ['administrador', 'conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']
+
+    roles.forEach((role) => expect(hasCapability(user([role]), 'settings.view')).toBe(true))
+    roles.slice(2).forEach((role) => expect(hasCapability(user([role]), 'settings.manage')).toBe(false))
+    expect(hasCapability(user(['administrador']), 'settings.manage')).toBe(true)
+    expect(hasCapability(user(['conselho']), 'settings.manage')).toBe(true)
+  })
+
   it('não autoriza usuário desativado', () => {
     const disabled = { ...user(['administrador']), status: 'desativado' as const }
     expect(hasCapability(disabled, 'users.manage')).toBe(false)

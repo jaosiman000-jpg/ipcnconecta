@@ -4,9 +4,7 @@ import {
   documentId,
   onSnapshot,
   query,
-  serverTimestamp,
   where,
-  writeBatch,
   type DocumentData,
   type Query,
   type QueryDocumentSnapshot,
@@ -15,6 +13,7 @@ import {
 } from 'firebase/firestore'
 import { firestore } from './firebase'
 import { hasCapability, isSuperuser } from './permissions'
+import { callSecureMutation, type SecureMutation } from './secureApi'
 import type { AppData, AuditEntry, Member, User } from './types'
 
 type DataKey = 'visitors' | 'classes' | 'attendance' | 'societies' | 'societyRequests' | 'finance'
@@ -37,14 +36,6 @@ function fromFirestore(value: unknown): unknown {
 
 function snapshotData<T>(snapshot: QueryDocumentSnapshot<DocumentData>) {
   return { ...fromFirestore(snapshot.data()) as object, id: snapshot.id } as T
-}
-
-function withoutUndefined<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(withoutUndefined) as T
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).map(([key, item]) => [key, withoutUndefined(item)])) as T
-  }
-  return value
 }
 
 function idQueries(name: string, ids: string[]): Query<DocumentData>[] {
@@ -157,50 +148,56 @@ function changed<T extends { id: string }>(before: T[], after: T[]) {
   }
 }
 
-function publicMember(member: Member) {
-  const { restrictedNotes: _restrictedNotes, documents: _documents, ...publicData } = member
-  return publicData
-}
-
-function directoryMember(member: Member) {
-  return { id: member.id, name: member.name, birthDate: member.birthDate, status: member.status }
-}
-
-export async function persistAppChange(before: AppData, after: AppData, user: User, action?: string, detail?: string) {
-  if (!firestore) throw new Error('O Firebase não está configurado.')
-  const db = firestore
-  const batch = writeBatch(db)
-
+function mutationForChange(before: AppData, after: AppData, action?: string): SecureMutation | undefined {
   const memberChanges = changed(before.members, after.members)
-  memberChanges.upserts.forEach((member) => {
-    batch.set(doc(db, 'members', member.id), withoutUndefined(publicMember(member)))
-    batch.set(doc(db, 'memberDirectory', member.id), directoryMember(member))
-    if (isSuperuser(user)) batch.set(doc(db, 'memberPrivate', member.id), withoutUndefined({ id: member.id, restrictedNotes: member.restrictedNotes, documents: member.documents }))
-  })
-  memberChanges.removed.forEach((member) => {
-    batch.delete(doc(db, 'members', member.id))
-    batch.delete(doc(db, 'memberDirectory', member.id))
-    if (isSuperuser(user)) batch.delete(doc(db, 'memberPrivate', member.id))
-  })
+  const visitorChanges = changed(before.visitors, after.visitors)
+  const classChanges = changed(before.classes, after.classes)
+  const attendanceChanges = changed(before.attendance, after.attendance)
+  const societyChanges = changed(before.societies, after.societies)
+  const requestChanges = changed(before.societyRequests, after.societyRequests)
+  const financeChanges = changed(before.finance, after.finance)
+  const removed = [memberChanges, visitorChanges, classChanges, attendanceChanges, societyChanges, requestChanges, financeChanges]
+    .some((change) => change.removed.length > 0)
+  if (removed) throw new Error('Exclusões ainda não estão disponíveis neste fluxo seguro.')
 
-  ;(Object.keys(collectionNames) as DataKey[]).forEach((key) => {
-    const changes = changed(before[key] as { id: string }[], after[key] as { id: string }[])
-    changes.upserts.forEach((item) => batch.set(doc(db, collectionNames[key], item.id), withoutUndefined(item)))
-    changes.removed.forEach((item) => batch.delete(doc(db, collectionNames[key], item.id)))
-  })
+  if (requestChanges.upserts.length === 1) {
+    const request = requestChanges.upserts[0]
+    const previous = before.societyRequests.find((item) => item.id === request.id)
+    if (previous?.status === 'pendente' && request.status !== 'pendente') {
+      return { type: 'society.request.review', requestId: request.id, approved: request.status === 'aprovada' }
+    }
+  }
 
+  const candidates: SecureMutation[] = []
+  if (memberChanges.upserts.length === 1) candidates.push({ type: 'member.save', member: memberChanges.upserts[0] })
+  if (visitorChanges.upserts.length === 1) {
+    const visitor = visitorChanges.upserts[0]
+    candidates.push(action === 'visitante.contatado'
+      ? { type: 'visitor.contact', visitorId: visitor.id }
+      : { type: 'visitor.save', visitor })
+  }
+  if (classChanges.upserts.length === 1) candidates.push({ type: 'ebd.class.save', item: classChanges.upserts[0] })
+  if (attendanceChanges.upserts.length === 1) {
+    const item = attendanceChanges.upserts[0]
+    candidates.push({ type: 'ebd.attendance.save', id: item.id, classId: item.classId, date: item.date, records: item.records })
+  }
+  if (societyChanges.upserts.length === 1) candidates.push({ type: 'society.save', item: societyChanges.upserts[0] })
+  if (requestChanges.upserts.length === 1) {
+    const item = requestChanges.upserts[0]
+    if (!before.societyRequests.some((entry) => entry.id === item.id)) {
+      candidates.push({ type: 'society.request.create', id: item.id, societyId: item.societyId, memberId: item.memberId })
+    }
+  }
+  if (financeChanges.upserts.length === 1) candidates.push({ type: 'finance.create', entry: financeChanges.upserts[0] })
   if (JSON.stringify(before.settings) !== JSON.stringify(after.settings)) {
-    batch.set(doc(db, 'appSettings', 'general'), withoutUndefined(after.settings))
+    candidates.push({ type: 'settings.update', whatsappMessage: after.settings.whatsappMessage })
   }
-  if (action) {
-    const auditRef = doc(collection(db, 'audit'))
-    batch.set(auditRef, {
-      actorId: user.id,
-      action: action.slice(0, 100),
-      detail: (detail ?? '').slice(0, 300),
-      targetId: '',
-      at: serverTimestamp(),
-    })
-  }
-  await batch.commit()
+  if (!candidates.length) return undefined
+  if (candidates.length !== 1) throw new Error('A operação tentou alterar mais de um módulo ao mesmo tempo.')
+  return candidates[0]
+}
+
+export async function persistAppChange(before: AppData, after: AppData, _user: User, action?: string, _detail?: string) {
+  const mutation = mutationForChange(before, after, action)
+  if (mutation) await callSecureMutation(mutation)
 }

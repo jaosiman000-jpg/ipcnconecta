@@ -32,6 +32,7 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Auditoria das alterações.
 - Sincronização em tempo real entre computadores e celulares.
 - PWA instalável com ícone da IPCN.
+- Escritas administrativas validadas por uma Vercel Function em `POST /api/mutations`.
 - Vercel Function de diagnóstico em `GET /api/health`.
 
 Uploads de documentos e comprovantes já possuem código e regras preparados, mas permanecem desabilitados até a ativação segura do Firebase Storage.
@@ -67,7 +68,7 @@ Itens sem permissão não aparecem na interface. As regras do Firestore repetem 
 
 ## Arquitetura
 
-Firebase é responsável por autenticação e sincronização dos dados. Vercel Functions é o backend HTTP para operações que precisam rodar no servidor. Não existe um servidor tradicional para manter ou dimensionar.
+Firebase é responsável pela autenticação, pelas leituras em tempo real e pelo armazenamento. As escritas administrativas passam por uma Vercel Function, que repete autenticação, autorização e validação no servidor. A Function acessa o Google Cloud por identidade federada OIDC, sem chave privada permanente. Não existe um servidor tradicional para manter ou dimensionar.
 
 O Service Worker armazena somente HTML e arquivos estáticos. Ele ignora `/api` e todos os serviços externos do Firebase para não persistir dados pessoais ou pastorais no cache PWA.
 
@@ -103,7 +104,7 @@ VITE_FIREBASE_APP_ID=
 VITE_FIREBASE_STORAGE_ENABLED=false
 ```
 
-As variáveis `VITE_*` fazem parte da configuração pública do aplicativo web Firebase, mas ainda devem permanecer fora do Git para evitar mistura entre ambientes.
+As variáveis `VITE_*` fazem parte da configuração pública do aplicativo web Firebase, mas ainda devem permanecer fora do Git para evitar mistura entre ambientes. As variáveis `GCP_*` são usadas somente pela Function e identificam a federação configurada em produção; elas não substituem nem contêm uma chave privada.
 
 ### Testar Vercel Functions localmente
 
@@ -113,7 +114,9 @@ vercel link
 npm run dev:vercel
 ```
 
-O frontend isolado funciona com `npm run dev`. Use `npm run dev:vercel` quando precisar testar as rotas em `api/`.
+O frontend isolado funciona com `npm run dev`. O fluxo privilegiado de `POST /api/mutations` depende da identidade OIDC emitida em um deployment da Vercel. Não conecte um preview ou ambiente local ao banco de produção; para testes integrados, use um projeto Firebase separado e uma identidade própria para esse ambiente.
+
+O provisionamento seguro da Function está documentado em [docs/SECURE_FUNCTIONS.md](docs/SECURE_FUNCTIONS.md).
 
 ## Validação
 
@@ -163,8 +166,8 @@ Veja também [CONTRIBUTING.md](CONTRIBUTING.md).
 - Firestore e sincronização em tempo real: implementados.
 - PWA e Service Worker seguro: implementados.
 - CI no GitHub e deploy contínuo na Vercel: implementados.
-- Firebase Storage: código pronto, aguardando plano e bucket.
+- Firebase Storage: código e regras prontos, aguardando plano e bucket.
 - Backup semanal: ainda não implementado.
-- Operações administrativas em Vercel Functions: expansão planejada após provisionamento de credenciais de servidor com menor privilégio.
+- Operações administrativas em Vercel Functions: publicadas em produção com identidade OIDC e sem chave privada permanente. Falta validar uma operação autenticada real antes de publicar as regras restritivas do Firestore.
 
 Este projeto ainda é um MVP e deve passar por revisão técnica e jurídica antes de armazenar grandes volumes de dados reais.

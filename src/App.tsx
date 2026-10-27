@@ -39,7 +39,7 @@ export function App() {
         <Route path="relatorios" element={<Guard capability="reports.view"><ReportsPage /></Guard>} />
         <Route path="usuarios" element={<Guard capability="users.manage"><UsersPage /></Guard>} />
         <Route path="auditoria" element={<Guard capability="audit.view"><AuditPage /></Guard>} />
-        <Route path="configuracoes" element={<Guard capability="settings.manage"><SettingsPage /></Guard>} />
+        <Route path="configuracoes" element={<Guard capability="settings.view"><SettingsPage /></Guard>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

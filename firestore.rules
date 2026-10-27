@@ -48,6 +48,10 @@ service cloud.firestore {
     }
 
     function societyManager() {
+      return superuser();
+    }
+
+    function societyReader() {
       return hasRole(['administrador', 'conselho', 'secretaria']);
     }
 
@@ -60,12 +64,6 @@ service cloud.firestore {
 
     function financeTeam() {
       return hasRole(['administrador', 'conselho', 'tesouraria']);
-    }
-
-    function validRoles(roles) {
-      return roles is list
-        && roles.size() <= 7
-        && roles.hasOnly(['administrador', 'conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']);
     }
 
     function validRequestedRoles(roles) {
@@ -110,145 +108,67 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
-    function validAccessUpdate(userId) {
-      let data = request.resource.data;
-      return request.auth.uid != userId
-        && data.diff(resource.data).affectedKeys().hasOnly([
-          'roles', 'requestedRoles', 'status', 'classIds', 'societyIds', 'office',
-          'approvedAt', 'approvedBy', 'updatedAt'
-        ])
-        && validRoles(data.roles)
-        && data.requestedRoles is list
-        && data.requestedRoles.size() <= 6
-        && data.requestedRoles.hasOnly(['conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento'])
-        && validStrings(data.classIds)
-        && validStrings(data.societyIds)
-        && data.office is string && data.office.size() >= 2 && data.office.size() <= 100
-        && (data.status == 'pendente' || data.status == 'ativo' || data.status == 'desativado')
-        && (data.status != 'ativo' || (data.emailVerified == true && data.roles.size() > 0))
-        && (resource.data.status != 'pendente' || data.status != 'ativo'
-          || (data.approvedBy == request.auth.uid && data.approvedAt == request.time))
-        && data.updatedAt == request.time;
-    }
-
-    function validEntity(data, entityId, allowedKeys) {
-      return data.keys().hasAll(['id'])
-        && data.keys().hasOnly(allowedKeys)
-        && data.id == entityId;
-    }
-
     match /users/{userId} {
       allow get: if signedIn() && (request.auth.uid == userId || superuser());
       allow list: if superuser();
       allow create: if signedIn() && validNewProfile(userId);
-      allow update: if signedIn() && (
-        (request.auth.uid == userId && validSelfVerification())
-        || (superuser() && validAccessUpdate(userId))
-      );
+      allow update: if signedIn() && request.auth.uid == userId && validSelfVerification();
       allow delete: if false;
     }
 
     match /members/{memberId} {
       allow read: if memberManager();
-      allow create, update: if memberManager()
-        && validEntity(request.resource.data, memberId, ['id', 'name', 'birthDate', 'phone', 'address', 'cpf', 'email', 'status', 'createdAt'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 3
-        && request.resource.data.name.size() <= 120;
-      allow delete: if memberManager();
+      allow create, update, delete: if false;
     }
 
     match /memberDirectory/{memberId} {
       allow read: if memberDirectoryReader();
-      allow create, update: if memberManager()
-        && validEntity(request.resource.data, memberId, ['id', 'name', 'birthDate', 'status']);
-      allow delete: if memberManager();
+      allow create, update, delete: if false;
     }
 
     match /memberPrivate/{memberId} {
       allow read: if superuser();
-      allow create, update: if superuser()
-        && validEntity(request.resource.data, memberId, ['id', 'restrictedNotes', 'documents']);
-      allow delete: if superuser();
+      allow create, update, delete: if false;
     }
 
     match /visitors/{visitorId} {
       allow read: if visitorTeam();
-      allow create, update: if visitorTeam()
-        && validEntity(request.resource.data, visitorId, [
-          'id', 'name', 'phone', 'birthDate', 'visitDate', 'consent', 'contacted',
-          'doNotContact', 'lastContactAt', 'contactOwner', 'createdAt'
-        ]);
-      allow delete: if visitorTeam();
+      allow create, update, delete: if false;
     }
 
     match /ebdClasses/{classId} {
       allow read: if ebdManager() || assignedClass(classId);
-      allow create, update: if ebdManager()
-        && validEntity(request.resource.data, classId, ['id', 'name', 'description', 'teacherIds', 'studentIds', 'active']);
-      allow delete: if ebdManager();
+      allow create, update, delete: if false;
     }
 
     match /attendance/{attendanceId} {
       allow read: if ebdManager() || assignedClass(resource.data.classId);
-      allow create: if (ebdManager() || assignedClass(request.resource.data.classId))
-        && validEntity(request.resource.data, attendanceId, ['id', 'classId', 'date', 'records', 'createdBy']);
-      allow update: if (ebdManager() || assignedClass(resource.data.classId))
-        && request.resource.data.classId == resource.data.classId
-        && validEntity(request.resource.data, attendanceId, ['id', 'classId', 'date', 'records', 'createdBy']);
-      allow delete: if ebdManager();
+      allow create, update, delete: if false;
     }
 
     match /societies/{societyId} {
-      allow read: if societyManager() || assignedSociety(societyId);
-      allow create, update: if societyManager()
-        && validEntity(request.resource.data, societyId, ['id', 'code', 'name', 'minAge', 'maxAge', 'leaderIds', 'memberIds', 'officers']);
-      allow delete: if false;
+      allow read: if societyReader() || assignedSociety(societyId);
+      allow create, update, delete: if false;
     }
 
     match /societyRequests/{requestId} {
       allow read: if societyManager() || (hasRole(['lider']) && resource.data.requestedBy == request.auth.uid);
-      allow create: if assignedSociety(request.resource.data.societyId)
-        && request.resource.data.requestedBy == request.auth.uid
-        && request.resource.data.status == 'pendente'
-        && validEntity(request.resource.data, requestId, ['id', 'societyId', 'memberId', 'requestedBy', 'requestedAt', 'status']);
-      allow update: if societyManager()
-        && validEntity(request.resource.data, requestId, ['id', 'societyId', 'memberId', 'requestedBy', 'requestedAt', 'status', 'reviewedBy']);
-      allow delete: if societyManager();
+      allow create, update, delete: if false;
     }
 
     match /financeEntries/{entryId} {
       allow read: if financeTeam();
-      allow create, update: if financeTeam()
-        && validEntity(request.resource.data, entryId, [
-          'id', 'type', 'date', 'amount', 'category', 'description', 'account',
-          'contributor', 'receiptName', 'receipt', 'createdBy'
-        ]);
-      allow delete: if financeTeam();
+      allow create, update, delete: if false;
     }
 
     match /appSettings/{settingsId} {
       allow read: if activeUser();
-      allow create, update: if superuser()
-        && settingsId == 'general'
-        && request.resource.data.keys().hasOnly(['whatsappMessage'])
-        && request.resource.data.whatsappMessage is string
-        && request.resource.data.whatsappMessage.size() <= 1000;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /audit/{eventId} {
       allow read: if superuser();
-      allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['actorId', 'action', 'detail', 'targetId', 'at'])
-        && request.resource.data.actorId == request.auth.uid
-        && request.resource.data.action is string
-        && request.resource.data.action.size() <= 100
-        && request.resource.data.detail is string
-        && request.resource.data.detail.size() <= 300
-        && request.resource.data.targetId is string
-        && request.resource.data.at == request.time;
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /{document=**} {

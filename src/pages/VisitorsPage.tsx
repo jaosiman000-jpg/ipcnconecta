@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Check, MessageCircle, Plus, UserRoundSearch } from 'lucide-react'
+import { Check, MessageCircle, Plus } from 'lucide-react'
 import { makeId, useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
 import { displayDate, phoneDigits } from '../app/format'
+import { hasCapability } from '../app/permissions'
 import type { Visitor } from '../app/types'
 import { EmptyState, Field, FormActions, Modal, PageHeader, SearchField, StatusBadge } from '../components/Common'
 
@@ -14,6 +15,8 @@ export function VisitorsPage() {
   const [editing, setEditing] = useState<Visitor | null>(null)
   const [consent, setConsent] = useState(true)
   const [doNotContact, setDoNotContact] = useState(false)
+  const [messageOpen, setMessageOpen] = useState(false)
+  const [messageBusy, setMessageBusy] = useState(false)
   const filtered = useMemo(() => data.visitors.filter((item) => `${item.name} ${item.phone}`.toLowerCase().includes(search.toLowerCase())), [data.visitors, search])
 
   function openNew() {
@@ -79,9 +82,19 @@ export function VisitorsPage() {
     }, 'visitante.contatado', visitor.name)
   }
 
+  async function saveWhatsappMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (messageBusy) return
+    const message = String(new FormData(event.currentTarget).get('message')).trim()
+    setMessageBusy(true)
+    const saved = await updateData((draft) => { draft.settings.whatsappMessage = message }, 'configuracao.whatsapp_atualizada', 'Mensagem de acolhimento')
+    setMessageBusy(false)
+    if (saved) setMessageOpen(false)
+  }
+
   return (
     <div className="page">
-      <PageHeader eyebrow="Acolhimento" title="Visitantes" description="Registre visitas e acompanhe o contato de boas-vindas." actions={<button className="button primary" onClick={openNew}><Plus size={18} /> Novo visitante</button>} />
+      <PageHeader eyebrow="Acolhimento" title="Visitantes" description="Registre visitas e acompanhe o contato de boas-vindas." actions={<>{hasCapability(currentUser, 'settings.manage') && <button className="button visitor-message-button" onClick={() => setMessageOpen(true)}><MessageCircle size={18} /> Editar mensagem</button>}<button className="button primary" onClick={openNew}><Plus size={18} /> Novo visitante</button></>} />
       <section className="panel table-panel">
         <div className="table-toolbar"><SearchField value={search} onChange={setSearch} placeholder="Buscar visitante" /><p className="table-count">{filtered.length} registro{filtered.length === 1 ? '' : 's'}</p></div>
         {filtered.length ? <div className="responsive-table"><table><thead><tr><th>Visitante</th><th>Data da visita</th><th>Consentimento</th><th>Contato</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{filtered.map((visitor) => {
@@ -89,7 +102,6 @@ export function VisitorsPage() {
           return <tr key={visitor.id}><td data-label="Visitante"><strong>{visitor.name}</strong><small>{visitor.phone}</small></td><td data-label="Data da visita">{displayDate(visitor.visitDate)}</td><td data-label="Consentimento"><StatusBadge tone={canContact ? 'success' : 'neutral'}>{canContact ? 'Autorizado' : 'Não autorizado'}</StatusBadge></td><td data-label="Contato">{visitor.contacted ? <span className="contacted"><Check size={16} /> Contatado</span> : 'Pendente'}<small>{visitor.contactOwner ?? ''}</small></td><td className="row-actions"><button className="button secondary small" onClick={() => openEdit(visitor)}>Editar</button>{canContact && <button className="button whatsapp small" onClick={() => openWhatsapp(visitor)}><MessageCircle size={17} /> WhatsApp</button>}</td></tr>
         })}</tbody></table></div> : <EmptyState title="Nenhum visitante encontrado" description="Cadastre o primeiro visitante para iniciar o acompanhamento." />}
       </section>
-      <div className="privacy-note"><UserRoundSearch size={20} /><p>Os dados de visitantes não são apagados automaticamente nesta versão. Respeite pedidos de correção, exclusão e interrupção de contato.</p></div>
       <Modal title={editing ? 'Editar visitante' : 'Novo visitante'} description="Colete apenas os dados necessários para o acolhimento." open={open} onClose={() => setOpen(false)}>
         <form key={editing?.id ?? 'new'} onSubmit={save}>
           <div className="form-grid">
@@ -101,6 +113,12 @@ export function VisitorsPage() {
             <label className="check-row"><input name="doNotContact" type="checkbox" checked={doNotContact} onChange={(event) => changeDoNotContact(event.target.checked)} /><span><strong>Não deseja mais contato</strong><small>Impede a abertura do WhatsApp para este cadastro.</small></span></label>
           </div>
           <FormActions onCancel={() => setOpen(false)} />
+        </form>
+      </Modal>
+      <Modal title="Editar mensagem de acolhimento" description="Este texto será usado ao abrir o WhatsApp de um visitante." open={messageOpen} onClose={() => setMessageOpen(false)}>
+        <form key={data.settings.whatsappMessage} onSubmit={saveWhatsappMessage}>
+          <Field label="Texto da mensagem" hint="Use [nome] e [responsável] para preencher automaticamente."><textarea name="message" rows={8} required maxLength={1000} defaultValue={data.settings.whatsappMessage} /></Field>
+          <FormActions onCancel={() => setMessageOpen(false)} submitLabel={messageBusy ? 'Salvando…' : 'Salvar mensagem'} disabled={messageBusy} />
         </form>
       </Modal>
     </div>

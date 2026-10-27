@@ -27,13 +27,13 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
   type Timestamp,
 } from 'firebase/firestore'
 import { authPersistenceReady, firebaseAuth, firebaseConfigured, firestore } from './firebase'
 import { isSuperuser } from './permissions'
+import { callSecureMutation } from './secureApi'
 import type { Role, User } from './types'
 
 export const PRIVACY_NOTICE_VERSION = '2026-10-26'
@@ -56,6 +56,11 @@ export interface AccessUpdate {
   office: string
 }
 
+export interface ProfileUpdate {
+  name: string
+  photo?: string
+}
+
 interface AuthContextValue {
   configured: boolean
   loading: boolean
@@ -69,6 +74,7 @@ interface AuthContextValue {
   resendVerification: () => Promise<string | null>
   refreshAccount: () => Promise<void>
   resetPassword: (email: string) => Promise<string | null>
+  updateOwnProfile: (profile: ProfileUpdate) => Promise<string | null>
   saveAccess: (user: User, access: AccessUpdate) => Promise<string | null>
   rejectAccess: (user: User) => Promise<string | null>
   toggleAccount: (user: User) => Promise<string | null>
@@ -258,70 +264,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const saveAccess = useCallback(async (user: User, access: AccessUpdate) => {
-    if (!firestore || !currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
-    if (!user.emailVerified) return 'O e-mail precisa estar verificado antes da aprovação.'
+  const updateOwnProfile = useCallback(async (nextProfile: ProfileUpdate) => {
+    if (!currentUser) return 'Entre novamente para continuar.'
     try {
-      const batch = writeBatch(firestore)
-      batch.update(doc(firestore, 'users', user.id), {
-        ...access,
-        requestedRoles: [],
-        status: 'ativo',
-        approvedAt: serverTimestamp(),
-        approvedBy: currentUser.id,
-        updatedAt: serverTimestamp(),
-      })
-      batch.set(doc(collection(firestore, 'audit')), {
-        actorId: currentUser.id,
-        action: user.status === 'pendente' ? 'usuario.aprovado' : 'usuario.permissoes_atualizadas',
-        detail: user.name,
-        targetId: user.id,
-        at: serverTimestamp(),
-      })
-      await batch.commit()
+      await callSecureMutation({ type: 'user.profile.update', name: nextProfile.name, photo: nextProfile.photo })
       return null
     } catch (error) {
-      return authError(error)
+      return error instanceof Error ? error.message : authError(error)
+    }
+  }, [currentUser])
+
+  const saveAccess = useCallback(async (user: User, access: AccessUpdate) => {
+    if (!currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
+    if (!user.emailVerified) return 'O e-mail precisa estar verificado antes da aprovação.'
+    try {
+      await callSecureMutation({ type: 'user.access.save', userId: user.id, roles: access.roles, classIds: access.classIds, societyIds: access.societyIds })
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : authError(error)
     }
   }, [currentUser])
 
   const rejectAccess = useCallback(async (user: User) => {
-    if (!firestore || !currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
+    if (!currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
     try {
-      const batch = writeBatch(firestore)
-      batch.update(doc(firestore, 'users', user.id), { status: 'desativado', roles: [], updatedAt: serverTimestamp() })
-      batch.set(doc(collection(firestore, 'audit')), {
-        actorId: currentUser.id,
-        action: 'usuario.pedido_recusado',
-        detail: user.name,
-        targetId: user.id,
-        at: serverTimestamp(),
-      })
-      await batch.commit()
+      await callSecureMutation({ type: 'user.access.reject', userId: user.id })
       return null
     } catch (error) {
-      return authError(error)
+      return error instanceof Error ? error.message : authError(error)
     }
   }, [currentUser])
 
   const toggleAccount = useCallback(async (user: User) => {
-    if (!firestore || !currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
+    if (!currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
     const nextStatus = user.status === 'ativo' ? 'desativado' : 'ativo'
     if (nextStatus === 'ativo' && !user.roles.length) return 'Defina pelo menos um papel antes de reativar.'
     try {
-      const batch = writeBatch(firestore)
-      batch.update(doc(firestore, 'users', user.id), { status: nextStatus, updatedAt: serverTimestamp() })
-      batch.set(doc(collection(firestore, 'audit')), {
-        actorId: currentUser.id,
-        action: nextStatus === 'ativo' ? 'usuario.reativado' : 'usuario.desativado',
-        detail: user.name,
-        targetId: user.id,
-        at: serverTimestamp(),
-      })
-      await batch.commit()
+      await callSecureMutation({ type: 'user.access.toggle', userId: user.id })
       return null
     } catch (error) {
-      return authError(error)
+      return error instanceof Error ? error.message : authError(error)
     }
   }, [currentUser])
 
@@ -338,10 +320,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resendVerification,
     refreshAccount,
     resetPassword,
+    updateOwnProfile,
     saveAccess,
     rejectAccess,
     toggleAccount,
-  }), [loading, authUser, profile, currentUser, accountUsers, login, logout, requestAccess, resendVerification, refreshAccount, resetPassword, saveAccess, rejectAccess, toggleAccount])
+  }), [loading, authUser, profile, currentUser, accountUsers, login, logout, requestAccess, resendVerification, refreshAccount, resetPassword, updateOwnProfile, saveAccess, rejectAccess, toggleAccount])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

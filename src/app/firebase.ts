@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { browserSessionPersistence, getAuth, setPersistence } from 'firebase/auth'
+import { browserLocalPersistence, browserSessionPersistence, getAuth, setPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
@@ -20,9 +20,11 @@ export const firebaseAuth = app ? getAuth(app) : null
 export const firestore = app ? getFirestore(app) : null
 export const firebaseStorage = app ? getStorage(app) : null
 
-export const authPersistenceReady = firebaseAuth
-  ? setPersistence(firebaseAuth, browserSessionPersistence)
-  : Promise.resolve()
+export function configureAuthPersistence(remember: boolean) {
+  return firebaseAuth
+    ? setPersistence(firebaseAuth, remember ? browserLocalPersistence : browserSessionPersistence)
+    : Promise.resolve()
+}
 
 if (firebaseAuth) {
   firebaseAuth.languageCode = 'pt-BR'

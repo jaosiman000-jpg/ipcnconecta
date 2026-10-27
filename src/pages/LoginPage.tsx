@@ -20,6 +20,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -35,7 +36,7 @@ export function LoginPage() {
     setBusy(true)
     setError('')
     setNotice('')
-    const message = await login(email, password)
+    const message = await login(email, password, remember)
     setBusy(false)
     if (message) setError(message)
     else navigate('/')
@@ -126,6 +127,7 @@ export function LoginPage() {
             <Field label="Senha">
               <span className="password-field"><input type={showPassword ? 'text' : 'password'} required value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></span>
             </Field>
+            <label className="remember-login"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>Manter conectado</span></label>
             {error && <p className="form-error" role="alert">{error}</p>}
             {notice && <p className="form-notice" role="status">{notice}</p>}
             <button className="button primary button-block" type="submit" disabled={busy || !configured}>{busy ? 'Entrando…' : <>Entrar <ArrowRight size={18} /></>}</button>

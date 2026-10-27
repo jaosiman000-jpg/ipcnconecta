@@ -31,7 +31,7 @@ import {
   type QueryDocumentSnapshot,
   type Timestamp,
 } from 'firebase/firestore'
-import { authPersistenceReady, firebaseAuth, firebaseConfigured, firestore } from './firebase'
+import { configureAuthPersistence, firebaseAuth, firebaseConfigured, firestore } from './firebase'
 import { isSuperuser } from './permissions'
 import { callSecureMutation } from './secureApi'
 import type { Role, User } from './types'
@@ -68,7 +68,7 @@ interface AuthContextValue {
   profile?: User
   currentUser?: User
   accountUsers: User[]
-  login: (email: string, password: string) => Promise<string | null>
+  login: (email: string, password: string, remember: boolean) => Promise<string | null>
   logout: () => Promise<void>
   requestAccess: (request: AccessRequest) => Promise<string | null>
   resendVerification: () => Promise<string | null>
@@ -191,10 +191,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const currentUser = profile?.status === 'ativo' && authUser?.emailVerified ? profile : undefined
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, remember: boolean) => {
     if (!firebaseAuth) return 'O Firebase ainda não foi configurado neste ambiente.'
     try {
-      await authPersistenceReady
+      await configureAuthPersistence(remember)
       await signInWithEmailAndPassword(firebaseAuth, email.trim().toLowerCase(), password)
       return null
     } catch (error) {
@@ -209,7 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const requestAccess = useCallback(async (request: AccessRequest) => {
     if (!firebaseAuth || !firestore) return 'O Firebase ainda não foi configurado neste ambiente.'
     try {
-      await authPersistenceReady
+      await configureAuthPersistence(false)
       const credential = await createUserWithEmailAndPassword(firebaseAuth, request.email, request.password)
       await updateProfile(credential.user, { displayName: request.name })
       await setDoc(doc(firestore, 'users', credential.user.uid), {

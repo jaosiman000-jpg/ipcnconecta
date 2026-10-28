@@ -1,12 +1,12 @@
 import { firebaseAuth } from './firebase'
-import type { EbdClass, FinanceEntry, Member, Role, Society, Visitor } from './types'
+import type { AttendanceSession, EbdClass, FinanceEntry, Member, Role, Society, Visitor } from './types'
 
 export type SecureMutation =
   | { type: 'member.save'; member: Member }
   | { type: 'visitor.save'; visitor: Visitor }
   | { type: 'visitor.contact'; visitorId: string }
   | { type: 'ebd.class.save'; item: EbdClass }
-  | { type: 'ebd.attendance.save'; id: string; classId: string; date: string; records: Record<string, string> }
+  | { type: 'ebd.attendance.save'; id: string; classId: string; date: string; records: AttendanceSession['records']; visitors: NonNullable<AttendanceSession['visitors']>; status: NonNullable<AttendanceSession['status']> }
   | { type: 'society.save'; item: Society }
   | { type: 'society.request.create'; id: string; societyId: string; memberId: string }
   | { type: 'society.request.review'; requestId: string; approved: boolean }

@@ -179,7 +179,7 @@ function mutationForChange(before: AppData, after: AppData, action?: string): Se
   if (classChanges.upserts.length === 1) candidates.push({ type: 'ebd.class.save', item: classChanges.upserts[0] })
   if (attendanceChanges.upserts.length === 1) {
     const item = attendanceChanges.upserts[0]
-    candidates.push({ type: 'ebd.attendance.save', id: item.id, classId: item.classId, date: item.date, records: item.records })
+    candidates.push({ type: 'ebd.attendance.save', id: item.id, classId: item.classId, date: item.date, records: item.records, visitors: item.visitors ?? [], status: item.status ?? 'finalizada' })
   }
   if (societyChanges.upserts.length === 1) candidates.push({ type: 'society.save', item: societyChanges.upserts[0] })
   if (requestChanges.upserts.length === 1) {

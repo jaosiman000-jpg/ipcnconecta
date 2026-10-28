@@ -71,6 +71,21 @@ describe('contrato das mutações seguras', () => {
     expect(parsed.success).toBe(false)
   })
 
+  it('aceita rascunho de chamada com visitante e recusa campos extras', () => {
+    const attendance = {
+      type: 'ebd.attendance.save',
+      id: 'attendance-1',
+      classId: 'class-1',
+      date: '2026-10-28',
+      records: { 'member-1': 'presente' },
+      visitors: [{ id: 'visitor-1', name: 'Visitante Teste', phone: '31999999999' }],
+      status: 'rascunho',
+    }
+
+    expect(mutationSchema.safeParse(attendance).success).toBe(true)
+    expect(mutationSchema.safeParse({ ...attendance, sundayOverride: true }).success).toBe(false)
+  })
+
   it('permite atualizar somente os dados pessoais do próprio perfil', () => {
     const valid = mutationSchema.safeParse({
       type: 'user.profile.update',

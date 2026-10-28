@@ -138,13 +138,14 @@ export function EmptyState({ title, description }: { title: string; description:
   return <div className="empty-state"><strong>{title}</strong><p>{description}</p></div>
 }
 
-export function Modal({ title, description, open, onClose, children, wide = false }: {
+export function Modal({ title, description, open, onClose, children, wide = false, className = '' }: {
   title: string
   description?: string
   open: boolean
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  className?: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
 
@@ -156,7 +157,7 @@ export function Modal({ title, description, open, onClose, children, wide = fals
   }, [open])
 
   return (
-    <dialog ref={ref} className={wide ? 'modal modal-wide' : 'modal'} onCancel={onClose} onClose={onClose}>
+    <dialog ref={ref} className={`${wide ? 'modal modal-wide' : 'modal'}${className ? ` ${className}` : ''}`} onCancel={onClose} onClose={onClose}>
       <div className="modal-header">
         <div><h2>{title}</h2>{description && <p>{description}</p>}</div>
         <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar"><X size={20} /></button>

@@ -43,10 +43,6 @@ function addAudit(batch: WriteBatch, db: Firestore, actor: Actor, result: AuditR
   })
 }
 
-function isSunday(date: string) {
-  return new Date(`${date}T12:00:00Z`).getUTCDay() === 0
-}
-
 function storedFilePathIsValid(file: { storagePath?: string } | undefined, prefix: string) {
   return !file || Boolean(file.storagePath?.startsWith(prefix))
 }
@@ -167,7 +163,6 @@ async function saveClass(db: Firestore, actor: Actor, input: Extract<MutationInp
 }
 
 async function saveAttendance(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'ebd.attendance.save' }>) {
-  if (!isSunday(input.date)) throw new ApiError(400, 'attendance_not_sunday', 'A chamada da EBD só pode ser registrada aos domingos.')
   const classRef = db.collection('ebdClasses').doc(input.classId)
   const classSnapshot = await classRef.get()
   if (!classSnapshot.exists) throw new ApiError(404, 'class_not_found', 'Classe não encontrada.')
@@ -179,12 +174,22 @@ async function saveAttendance(db: Firestore, actor: Actor, input: Extract<Mutati
   if (Object.keys(input.records).some((memberId) => !students.has(memberId))) {
     throw new ApiError(400, 'attendance_student_invalid', 'A chamada contém uma pessoa que não pertence à classe.')
   }
+  if (Object.values(input.records).some((status) => status === 'visitante')) {
+    throw new ApiError(400, 'attendance_status_invalid', 'Visitantes devem ser registrados na área própria da chamada.')
+  }
+  if (input.status === 'finalizada' && [...students].some((memberId) => !input.records[memberId])) {
+    throw new ApiError(400, 'attendance_incomplete', 'Marque a presença de todos os alunos antes de finalizar a chamada.')
+  }
 
   const existing = await db.collection('attendance').where('classId', '==', input.classId).where('date', '==', input.date).limit(1).get()
-  const ref = existing.docs[0]?.ref ?? db.collection('attendance').doc(input.id)
+  const existingDocument = existing.docs[0]
+  if (existingDocument && existingDocument.data().status !== 'rascunho' && !manager) {
+    throw new ApiError(409, 'attendance_finalized', 'Esta chamada já foi finalizada.')
+  }
+  const ref = existingDocument?.ref ?? db.collection('attendance').doc(`${input.classId}_${input.date}`)
   const batch = db.batch()
-  batch.set(ref, { id: ref.id, classId: input.classId, date: input.date, records: input.records, createdBy: actor.id })
-  const result = { action: 'ebd.chamada_salva', detail: `${String(classData.name ?? 'Classe')} em ${input.date}`, targetId: ref.id }
+  batch.set(ref, clean({ id: ref.id, classId: input.classId, date: input.date, records: input.records, visitors: input.visitors, status: input.status, createdBy: actor.id, updatedAt: Timestamp.now() }))
+  const result = { action: input.status === 'finalizada' ? 'ebd.chamada_finalizada' : 'ebd.chamada_rascunho', detail: `${String(classData.name ?? 'Classe')} em ${input.date}`, targetId: ref.id }
   addAudit(batch, db, actor, result)
   await batch.commit()
   return result

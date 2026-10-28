@@ -11,6 +11,12 @@ export type UserStatus = 'ativo' | 'pendente' | 'desativado'
 export type MemberStatus = 'Ativo' | 'Em análise' | 'Disciplinado' | 'Excluído' | 'Falecido'
 export type AttendanceStatus = 'presente' | 'ausente' | 'justificado' | 'visitante'
 
+export interface AttendanceVisitor {
+  id: string
+  name: string
+  phone?: string
+}
+
 export interface User {
   id: string
   name: string
@@ -82,6 +88,8 @@ export interface AttendanceSession {
   classId: string
   date: string
   records: Record<string, AttendanceStatus>
+  visitors?: AttendanceVisitor[]
+  status?: 'rascunho' | 'finalizada'
   createdBy: string
 }
 

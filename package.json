@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:vercel": "vercel dev",
+    "dev:vercel": "vercel dev -A vercel.dev.json",
     "build": "tsc -b && npm run check:api && vite build",
     "check:api": "tsc -p tsconfig.api.json",
     "preview": "vite preview",

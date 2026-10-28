@@ -38,7 +38,10 @@ export function ReportsPage() {
       }
       if (key === 'members' || key === 'all') addSheet('Membros', data.members.map((item) => ({ Nome: item.name, Nascimento: item.birthDate, Celular: item.phone, Endereço: item.address, CPF: item.cpf, Email: item.email, Situação: item.status, ...(isSuperuser(currentUser) ? { 'Observações restritas': item.restrictedNotes } : {}) })))
       if (key === 'visitors' || key === 'all') addSheet('Visitantes', data.visitors.map((item) => ({ Nome: item.name, Celular: item.phone, Nascimento: item.birthDate, Visita: item.visitDate, Consentimento: item.consent ? 'Sim' : 'Não', Contatado: item.contacted ? 'Sim' : 'Não', 'Não contatar': item.doNotContact ? 'Sim' : 'Não' })))
-      if (key === 'ebd' || key === 'all') addSheet('EBD', data.attendance.flatMap((session) => Object.entries(session.records).map(([memberId, status]) => ({ Classe: data.classes.find((item) => item.id === session.classId)?.name, Data: session.date, Aluno: data.members.find((item) => item.id === memberId)?.name, Presença: status }))))
+      if (key === 'ebd' || key === 'all') addSheet('EBD', data.attendance.flatMap((session) => [
+        ...Object.entries(session.records).map(([memberId, status]) => ({ Classe: data.classes.find((item) => item.id === session.classId)?.name, Data: session.date, Aluno: data.members.find((item) => item.id === memberId)?.name, Telefone: data.members.find((item) => item.id === memberId)?.phone, Presença: status })),
+        ...(session.visitors ?? []).map((visitor) => ({ Classe: data.classes.find((item) => item.id === session.classId)?.name, Data: session.date, Aluno: visitor.name, Telefone: visitor.phone, Presença: 'visitante' })),
+      ]))
       if (key === 'societies' || key === 'all') addSheet('Sociedades', data.societies.flatMap((society) => society.memberIds.map((memberId) => ({ Sociedade: society.code, Nome: data.members.find((item) => item.id === memberId)?.name, 'Idade mínima': society.minAge, 'Idade máxima': society.maxAge }))))
       if (key === 'finance' || key === 'all') addSheet('Financeiro', data.finance.map((item) => ({ Data: item.date, Tipo: item.type, Valor: item.amount, Categoria: item.category, Descrição: item.description, Conta: item.account, Contribuinte: item.contributor, Comprovante: item.receiptName })))
       const buffer = await workbook.xlsx.writeBuffer()

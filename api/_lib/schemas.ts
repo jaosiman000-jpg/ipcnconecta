@@ -60,6 +60,11 @@ const ebdClass = z.object({
 }).strict()
 
 const attendanceRecords = z.record(id, z.enum(['presente', 'ausente', 'justificado', 'visitante']))
+const attendanceVisitors = z.array(z.object({
+  id,
+  name: z.string().trim().min(2).max(120),
+  phone: optionalText(30),
+}).strict()).max(30)
 
 const societyOfficer = z.object({
   memberId: id,
@@ -103,7 +108,7 @@ export const mutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('visitor.save'), visitor }).strict(),
   z.object({ type: z.literal('visitor.contact'), visitorId: id }).strict(),
   z.object({ type: z.literal('ebd.class.save'), item: ebdClass }).strict(),
-  z.object({ type: z.literal('ebd.attendance.save'), id, classId: id, date: isoDate, records: attendanceRecords }).strict(),
+  z.object({ type: z.literal('ebd.attendance.save'), id, classId: id, date: isoDate, records: attendanceRecords, visitors: attendanceVisitors, status: z.enum(['rascunho', 'finalizada']) }).strict(),
   z.object({ type: z.literal('society.save'), item: society }).strict(),
   z.object({ type: z.literal('society.request.create'), id, societyId: id, memberId: id }).strict(),
   z.object({ type: z.literal('society.request.review'), requestId: id, approved: z.boolean() }).strict(),

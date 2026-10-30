@@ -23,7 +23,7 @@ function optionalBoolean(value: FormDataEntryValue | null) {
 }
 
 function personInput(person: Person): PersonInput {
-  const { createdAt: _createdAt, updatedAt: _updatedAt, ...input } = person
+  const { authUserId: _authUserId, createdAt: _createdAt, updatedAt: _updatedAt, ...input } = person
   return input
 }
 

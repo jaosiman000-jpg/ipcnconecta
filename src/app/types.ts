@@ -174,7 +174,7 @@ export interface Person {
   updatedAt?: string
 }
 
-export type PersonInput = Omit<Person, 'createdAt' | 'updatedAt'>
+export type PersonInput = Omit<Person, 'authUserId' | 'createdAt' | 'updatedAt'>
 
 export interface ContributionBatchItem {
   id: string

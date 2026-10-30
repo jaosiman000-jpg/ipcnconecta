@@ -23,6 +23,15 @@ describe('contrato das mutações seguras', () => {
     expect(parsed.success).toBe(false)
   })
 
+  it('recusa campos internos de vínculo no cadastro de pessoa', () => {
+    const parsed = mutationSchema.safeParse({
+      type: 'person.save',
+      person: { id: 'person-1', name: 'Pessoa Teste', authUserId: 'user-1', tither: true, status: 'ativo' },
+    })
+
+    expect(parsed.success).toBe(false)
+  })
+
   it('recusa consentimento e bloqueio de contato simultâneos', () => {
     const parsed = mutationSchema.safeParse({
       type: 'visitor.save',

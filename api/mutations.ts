@@ -134,6 +134,7 @@ async function savePerson(db: Firestore, actor: Actor, input: Extract<MutationIn
     const now = Timestamp.now()
     const saved = clean({
       ...item,
+      authUserId: previous.authUserId,
       ebd: nextEbdData,
       membership: nextMembership,
       source: previous.source ?? item.source ?? 'manual',

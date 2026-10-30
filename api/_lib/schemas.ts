@@ -156,7 +156,8 @@ export const mutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('finance.entry.cancel'), entryId: id, reason: z.string().trim().min(5).max(500) }).strict(),
   z.object({ type: z.literal('settings.update'), whatsappMessage: z.string().trim().min(1).max(1000) }).strict(),
   z.object({ type: z.literal('user.profile.update'), name: z.string().trim().min(3).max(120), photo: profilePhoto.optional() }).strict(),
-  z.object({ type: z.literal('user.access.save'), userId: id, roles, classIds: ids, societyIds: ids }).strict(),
+  z.object({ type: z.literal('user.access.save'), userId: id, personId: id, roles, classIds: ids, societyIds: ids }).strict(),
+  z.object({ type: z.literal('user.person.link'), userId: id, personId: id }).strict(),
   z.object({ type: z.literal('user.access.reject'), userId: id }).strict(),
   z.object({ type: z.literal('user.access.toggle'), userId: id }).strict(),
 ])

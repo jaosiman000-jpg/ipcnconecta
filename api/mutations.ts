@@ -631,14 +631,24 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
 
   let result: AuditResult | undefined
   await db.runTransaction(async (transaction) => {
-    const [target, users, classes, societies] = await Promise.all([
+    const personRef = db.collection('people').doc(input.personId)
+    const [target, users, classes, societies, person] = await Promise.all([
       transaction.get(db.collection('users').doc(input.userId)),
       transaction.get(db.collection('users')),
       transaction.get(db.collection('ebdClasses')),
       transaction.get(db.collection('societies')),
+      transaction.get(personRef),
     ])
     if (!target.exists) throw new ApiError(404, 'user_not_found', 'Usuário não encontrado.')
+    if (!person.exists || person.data()?.status !== 'ativo') throw new ApiError(404, 'person_not_found', 'O cadastro selecionado não está disponível.')
     const targetData = target.data() ?? {}
+    const personData = person.data() ?? {}
+    if (personData.authUserId && personData.authUserId !== input.userId) throw new ApiError(409, 'person_already_linked', 'Este cadastro já está vinculado a outra conta.')
+    if (users.docs.some((user) => user.id !== input.userId && user.data().personId === input.personId)) throw new ApiError(409, 'person_already_linked', 'Este cadastro já está vinculado a outra conta.')
+    const previousPersonId = typeof targetData.personId === 'string' ? targetData.personId : undefined
+    const previousPerson = previousPersonId && previousPersonId !== input.personId
+      ? await transaction.get(db.collection('people').doc(previousPersonId))
+      : undefined
     const nextIsSuperuser = input.roles.some((role) => SUPERUSER_ROLES.includes(role))
     if (activeSuperuser(targetData) && !nextIsSuperuser && !users.docs.some((user) => user.id !== input.userId && activeSuperuser(user.data()))) {
       throw new ApiError(409, 'last_superuser', 'O sistema precisa manter pelo menos um Administrador ou membro do Conselho ativo.')
@@ -648,6 +658,7 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
       requestedRoles: [],
       classIds,
       societyIds,
+      personId: input.personId,
       office: input.roles.map((role) => ROLE_LABELS[role]).join(', '),
       status: 'ativo',
       emailVerified: true,
@@ -655,6 +666,8 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
       approvedBy: actor.id,
       updatedAt: Timestamp.now(),
     })
+    if (previousPerson?.exists && previousPerson.data()?.authUserId === input.userId) transaction.update(previousPerson.ref, { authUserId: null, updatedAt: Timestamp.now() })
+    transaction.update(personRef, { authUserId: input.userId, updatedAt: Timestamp.now() })
     classes.docs.forEach((entry) => {
       const teacherIds: string[] = Array.isArray(entry.data().teacherIds) ? (entry.data().teacherIds as unknown[]).map(String).filter((id) => id !== input.userId) : []
       if (classIds.includes(entry.id)) teacherIds.push(input.userId)
@@ -670,6 +683,37 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
       detail: String(targetData.name ?? ''),
       targetId: input.userId,
     }
+    transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: Timestamp.now() })
+  })
+  return result!
+}
+
+async function linkUserPerson(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'user.person.link' }>) {
+  requireRole(actor, SUPERUSER_ROLES)
+  let result: AuditResult | undefined
+  await db.runTransaction(async (transaction) => {
+    const userRef = db.collection('users').doc(input.userId)
+    const personRef = db.collection('people').doc(input.personId)
+    const [target, users, person] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(db.collection('users')),
+      transaction.get(personRef),
+    ])
+    if (!target.exists) throw new ApiError(404, 'user_not_found', 'Usuário não encontrado.')
+    if (target.data()?.status === 'pendente') throw new ApiError(409, 'user_pending', 'Vincule o cadastro durante a aprovação desta conta.')
+    if (!person.exists || person.data()?.status !== 'ativo') throw new ApiError(404, 'person_not_found', 'O cadastro selecionado não está disponível.')
+    if (person.data()?.authUserId && person.data()?.authUserId !== input.userId) throw new ApiError(409, 'person_already_linked', 'Este cadastro já está vinculado a outra conta.')
+    if (users.docs.some((user) => user.id !== input.userId && user.data().personId === input.personId)) throw new ApiError(409, 'person_already_linked', 'Este cadastro já está vinculado a outra conta.')
+
+    const targetData = target.data() ?? {}
+    const previousPersonId = typeof targetData.personId === 'string' ? targetData.personId : undefined
+    const previousPerson = previousPersonId && previousPersonId !== input.personId
+      ? await transaction.get(db.collection('people').doc(previousPersonId))
+      : undefined
+    if (previousPerson?.exists && previousPerson.data()?.authUserId === input.userId) transaction.update(previousPerson.ref, { authUserId: null, updatedAt: Timestamp.now() })
+    transaction.update(userRef, { personId: input.personId, updatedAt: Timestamp.now() })
+    transaction.update(personRef, { authUserId: input.userId, updatedAt: Timestamp.now() })
+    result = { action: 'usuario.pessoa_vinculada', detail: String(targetData.name ?? ''), targetId: input.userId }
     transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: Timestamp.now() })
   })
   return result!
@@ -740,6 +784,7 @@ async function executeMutation(input: MutationInput, actor: Actor, services: Ret
     case 'settings.update': return updateSettings(db, actor, input)
     case 'user.profile.update': return updateOwnProfile(db, actor, input)
     case 'user.access.save': return saveUserAccess(db, actor, input, auth)
+    case 'user.person.link': return linkUserPerson(db, actor, input)
     case 'user.access.reject': return rejectUserAccess(db, actor, input)
     case 'user.access.toggle': return toggleUserAccess(db, actor, input, auth)
   }

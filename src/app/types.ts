@@ -22,6 +22,7 @@ export interface AttendanceVisitor {
 
 export interface User {
   id: string
+  personId?: string
   name: string
   email: string
   photo?: string
@@ -130,6 +131,7 @@ export type ContributionStatus = 'ativo' | 'cancelado'
 
 export interface Person {
   id: string
+  authUserId?: string
   name: string
   birthDate?: string
   phone?: string

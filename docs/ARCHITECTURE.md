@@ -32,6 +32,7 @@ flowchart LR
 
 - `users`: perfis, papéis e escopos.
 - `people`: cadastro mestre; cada pessoa pode possuir vínculos independentes com membros, EBD e dízimos.
+- `users.personId` e `people.authUserId`: vínculo 1:1 entre a credencial de acesso e o cadastro mestre, validado em transação pelo backend.
 - `members`: projeção dos dados gerais das pessoas oficialmente recebidas como membros.
 - `memberDirectory`: diretório mínimo de membros para os fluxos das sociedades.
 - `memberPrivate`: observações e documentos pastorais restritos.
@@ -50,6 +51,8 @@ flowchart LR
 ## Autorização
 
 Administrador e Conselho são superusuários. Secretaria, Junta Diaconal, Professor, Líder e Acolhimento recebem apenas os módulos necessários. Papéis são cumulativos. Classes e sociedades também possuem escopos próprios.
+
+Na aprovação de uma conta, Administrador ou Conselho deve selecionar uma pessoa já cadastrada. O backend impede que duas contas usem a mesma pessoa e registra toda criação ou correção de vínculo na auditoria.
 
 ## CI/CD
 

@@ -35,6 +35,7 @@ describe('contrato das mutações seguras', () => {
     const duplicatedRoles = mutationSchema.safeParse({
       type: 'user.access.save',
       userId: 'user-1',
+      personId: 'person-1',
       roles: ['professor', 'professor'],
       classIds: [],
       societyIds: [],
@@ -43,6 +44,16 @@ describe('contrato das mutações seguras', () => {
 
     expect(duplicatedRoles.success).toBe(false)
     expect(invalidId.success).toBe(false)
+  })
+
+  it('exige pessoa na aprovação e valida o vínculo direto', () => {
+    const missingPerson = mutationSchema.safeParse({
+      type: 'user.access.save', userId: 'user-1', roles: ['administrador'], classIds: [], societyIds: [],
+    })
+    const validLink = mutationSchema.safeParse({ type: 'user.person.link', userId: 'user-1', personId: 'person-1' })
+
+    expect(missingPerson.success).toBe(false)
+    expect(validLink.success).toBe(true)
   })
 
   it('aceita lote de contribuições e recusa dízimo anônimo', () => {

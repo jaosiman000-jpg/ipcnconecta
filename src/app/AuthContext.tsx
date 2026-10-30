@@ -50,6 +50,7 @@ export interface AccessRequest {
 }
 
 export interface AccessUpdate {
+  personId: string
   roles: Role[]
   classIds: string[]
   societyIds: string[]
@@ -76,6 +77,7 @@ interface AuthContextValue {
   resetPassword: (email: string) => Promise<string | null>
   updateOwnProfile: (profile: ProfileUpdate) => Promise<string | null>
   saveAccess: (user: User, access: AccessUpdate) => Promise<string | null>
+  linkPerson: (user: User, personId: string) => Promise<string | null>
   rejectAccess: (user: User) => Promise<string | null>
   toggleAccount: (user: User) => Promise<string | null>
 }
@@ -91,6 +93,7 @@ function iso(value: unknown) {
 function dataToUser(id: string, data: DocumentData): User {
   return {
     id,
+    personId: typeof data.personId === 'string' ? data.personId : undefined,
     name: String(data.name ?? ''),
     email: String(data.email ?? ''),
     photo: typeof data.photo === 'string' ? data.photo : undefined,
@@ -278,7 +281,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!currentUser || !isSuperuser(currentUser) || user.id === currentUser.id) return 'Ação não permitida.'
     if (!user.emailVerified) return 'O e-mail precisa estar verificado antes da aprovação.'
     try {
-      await callSecureMutation({ type: 'user.access.save', userId: user.id, roles: access.roles, classIds: access.classIds, societyIds: access.societyIds })
+      await callSecureMutation({ type: 'user.access.save', userId: user.id, personId: access.personId, roles: access.roles, classIds: access.classIds, societyIds: access.societyIds })
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : authError(error)
+    }
+  }, [currentUser])
+
+  const linkPerson = useCallback(async (user: User, personId: string) => {
+    if (!currentUser || !isSuperuser(currentUser)) return 'Ação não permitida.'
+    try {
+      await callSecureMutation({ type: 'user.person.link', userId: user.id, personId })
       return null
     } catch (error) {
       return error instanceof Error ? error.message : authError(error)
@@ -322,9 +335,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetPassword,
     updateOwnProfile,
     saveAccess,
+    linkPerson,
     rejectAccess,
     toggleAccount,
-  }), [loading, authUser, profile, currentUser, accountUsers, login, logout, requestAccess, resendVerification, refreshAccount, resetPassword, updateOwnProfile, saveAccess, rejectAccess, toggleAccount])
+  }), [loading, authUser, profile, currentUser, accountUsers, login, logout, requestAccess, resendVerification, refreshAccount, resetPassword, updateOwnProfile, saveAccess, linkPerson, rejectAccess, toggleAccount])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

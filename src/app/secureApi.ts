@@ -17,7 +17,8 @@ export type SecureMutation =
   | { type: 'finance.entry.cancel'; entryId: string; reason: string }
   | { type: 'settings.update'; whatsappMessage: string }
   | { type: 'user.profile.update'; name: string; photo?: string }
-  | { type: 'user.access.save'; userId: string; roles: Role[]; classIds: string[]; societyIds: string[] }
+  | { type: 'user.access.save'; userId: string; personId: string; roles: Role[]; classIds: string[]; societyIds: string[] }
+  | { type: 'user.person.link'; userId: string; personId: string }
   | { type: 'user.access.reject'; userId: string }
   | { type: 'user.access.toggle'; userId: string }
 

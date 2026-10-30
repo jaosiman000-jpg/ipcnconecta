@@ -23,6 +23,7 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Aprovação por Administrador ou Conselho.
 - Papéis cumulativos no mesmo login.
 - Cadastro unificado de pessoas com vínculos independentes de membro, EBD e dízimos.
+- Vinculação única entre a conta de login e o cadastro da pessoa, exigida durante a aprovação.
 - Matrícula da EBD e número de membro gerados separadamente pelo servidor.
 - Área pastoral restrita ao Conselho e Administração.
 - Visitantes, consentimento e contato manual pelo WhatsApp.

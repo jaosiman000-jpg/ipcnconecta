@@ -11,8 +11,8 @@ export function DashboardPage() {
   const { currentUser, accountUsers } = useAuth()
   const activeMembers = data.members.filter((member) => member.status === 'Ativo').length
   const month = new Date().toISOString().slice(0, 7)
-  const monthlyEntries = data.finance.filter((entry) => entry.date.startsWith(month))
-  const balance = monthlyEntries.reduce((total, entry) => total + (entry.type === 'entrada' ? entry.amount : -entry.amount), 0)
+  const monthlyEntries = data.finance.filter((entry) => entry.date.startsWith(month) && entry.status !== 'cancelado')
+  const received = monthlyEntries.reduce((total, entry) => total + entry.amount, 0)
   const pending = accountUsers.filter((user) => user.status === 'pendente').length + data.societyRequests.filter((item) => item.status === 'pendente').length
   const recentAudit = data.audit.slice(0, 5)
 
@@ -23,7 +23,7 @@ export function DashboardPage() {
         {hasCapability(currentUser, 'members.view') && <StatCard label="Membros ativos" value={activeMembers} helper={`${data.members.length} cadastros no total`} icon={<Users size={22} />} />}
         {hasCapability(currentUser, 'visitors.view') && <StatCard label="Visitantes" value={data.visitors.length} helper={`${data.visitors.filter((item) => !item.contacted).length} aguardando contato`} icon={<UserRoundSearch size={22} />} />}
         {hasCapability(currentUser, 'ebd.view') && <StatCard label="Classes da EBD" value={data.classes.filter((item) => item.active).length} helper={`${data.attendance.length} chamadas registradas`} icon={<BookOpenCheck size={22} />} />}
-        {hasCapability(currentUser, 'finance.view') && <StatCard label="Saldo do mês" value={money.format(balance)} helper={`${monthlyEntries.length} lançamentos`} icon={<CircleDollarSign size={22} />} />}
+        {hasCapability(currentUser, 'finance.view') && <StatCard label="Recebido no mês" value={money.format(received)} helper={`${monthlyEntries.length} contribuições ativas`} icon={<CircleDollarSign size={22} />} />}
       </section>
 
       <div className="dashboard-grid">

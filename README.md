@@ -22,12 +22,13 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Solicitação de acesso com foto e atuações desejadas.
 - Aprovação por Administrador ou Conselho.
 - Papéis cumulativos no mesmo login.
-- Gestão de membros e situação eclesiástica.
+- Cadastro unificado de pessoas com vínculos independentes de membro, EBD e dízimos.
+- Matrícula da EBD e número de membro gerados separadamente pelo servidor.
 - Área pastoral restrita ao Conselho e Administração.
 - Visitantes, consentimento e contato manual pelo WhatsApp.
 - Classes, professores, alunos, chamadas aos domingos e relatórios da EBD.
 - Sociedades internas UCP, UPA, UMP, UPH e SAF.
-- Financeiro básico com entradas, saídas e categorias.
+- Financeiro da Junta Diaconal com lotes de dízimos, ofertas e missões em dinheiro ou PIX.
 - Relatórios e exportação de planilhas.
 - Auditoria das alterações.
 - Sincronização em tempo real entre computadores e celulares.
@@ -44,7 +45,7 @@ Uploads de documentos e comprovantes já possuem código e regras preparados, ma
 | Administrador | Acesso completo |
 | Conselho | Mesmo acesso do Administrador |
 | Secretaria | Membros, visitantes, EBD, sociedades e relatórios |
-| Tesouraria | Financeiro e relatórios financeiros |
+| Junta Diaconal | Registro e cancelamento justificado de contribuições e relatórios financeiros |
 | Professor | Chamada e relatório das classes atribuídas |
 | Líder | Sociedades atribuídas e pedidos de inclusão |
 | Acolhimento | Cadastro, consulta e contato de visitantes |

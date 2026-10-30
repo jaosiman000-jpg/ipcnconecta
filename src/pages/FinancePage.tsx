@@ -1,74 +1,110 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { ArrowDownLeft, ArrowUpRight, CircleDollarSign, FileText, Plus } from 'lucide-react'
-import { makeId, useApp } from '../app/AppContext'
-import { useAuth } from '../app/AuthContext'
-import { documentUploadsEnabled, downloadStoredFile, removeStoredFile, uploadStoredFile } from '../app/fileStorage'
+import { Banknote, Download, MoreHorizontal, Plus, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useApp } from '../app/AppContext'
 import { displayDate, money } from '../app/format'
-import { hasCapability } from '../app/permissions'
-import type { FinanceEntry } from '../app/types'
-import { CustomSelect, EmptyState, Field, FileUploadField, FormActions, Modal, PageHeader, SearchField, StatCard, StatusBadge } from '../components/Common'
+import { callSecureMutation } from '../app/secureApi'
+import type { ContributionCategory, FinanceEntry, PaymentMethod } from '../app/types'
+import { useAuth } from '../app/AuthContext'
+import { CustomSelect, EmptyState, Field, FormActions, Modal, PageHeader, SearchField, StatusBadge } from '../components/Common'
+import { PixIcon } from '../components/PixIcon'
 
-const categories = ['Dízimos', 'Ofertas', 'Missões', 'Doações', 'Manutenção', 'Ação social', 'Eventos', 'Outros']
+const categories = ['Todos', 'Dízimo', 'Oferta', 'Missões'] as const
+const methods = ['Todos', 'Dinheiro', 'PIX'] as const
+const statuses = ['Todos', 'Ativo', 'Cancelado'] as const
 
 export function FinancePage() {
-  const { data, updateData } = useApp()
-  const { currentUser } = useAuth()
+  const { data } = useApp()
+  const { currentUser, accountUsers } = useAuth()
+  const [tab, setTab] = useState<'entries' | 'contributors'>('entries')
   const [search, setSearch] = useState('')
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
-  const [open, setOpen] = useState(false)
-  const canManage = hasCapability(currentUser, 'finance.manage')
-  const entries = useMemo(() => data.finance.filter((item) => item.date.startsWith(month) && `${item.description} ${item.category} ${item.contributor ?? ''}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date)), [data.finance, month, search])
-  const income = entries.filter((item) => item.type === 'entrada').reduce((sum, item) => sum + item.amount, 0)
-  const expense = entries.filter((item) => item.type === 'saída').reduce((sum, item) => sum + item.amount, 0)
+  const [category, setCategory] = useState<(typeof categories)[number]>('Todos')
+  const [method, setMethod] = useState<(typeof methods)[number]>('Todos')
+  const [status, setStatus] = useState<(typeof statuses)[number]>('Todos')
+  const [cancelling, setCancelling] = useState<FinanceEntry | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  async function save(event: FormEvent<HTMLFormElement>) {
+  const monthEntries = useMemo(() => data.finance.filter((entry) => entry.date.startsWith(month)), [data.finance, month])
+  const activeEntries = monthEntries.filter((entry) => entry.status !== 'cancelado')
+  const total = activeEntries.reduce((sum, entry) => sum + entry.amount, 0)
+  const categoryTotal = (value: ContributionCategory) => activeEntries.filter((entry) => entry.category === value).reduce((sum, entry) => sum + entry.amount, 0)
+  const methodTotal = (value: PaymentMethod) => activeEntries.filter((entry) => entry.method === value).reduce((sum, entry) => sum + entry.amount, 0)
+
+  const entries = useMemo(() => monthEntries.filter((entry) => {
+    const text = `${entry.contributorName} ${entry.category} ${entry.createdByName}`.toLowerCase()
+    return text.includes(search.toLowerCase())
+      && (category === 'Todos' || entry.category === category)
+      && (method === 'Todos' || entry.method === method)
+      && (status === 'Todos' || (status === 'Ativo' ? entry.status !== 'cancelado' : entry.status === 'cancelado'))
+  }).sort((a, b) => `${b.date}${b.createdAt}`.localeCompare(`${a.date}${a.createdAt}`)), [monthEntries, search, category, method, status])
+
+  const contributors = useMemo(() => {
+    const grouped = new Map<string, { name: string; entries: number; total: number; lastDate: string }>()
+    data.finance.filter((entry) => entry.status !== 'cancelado' && !entry.anonymous).forEach((entry) => {
+      const key = entry.personId ?? entry.contributorName
+      const current = grouped.get(key) ?? { name: entry.contributorName, entries: 0, total: 0, lastDate: '' }
+      current.entries += 1
+      current.total += entry.amount
+      if (entry.date > current.lastDate) current.lastDate = entry.date
+      grouped.set(key, current)
+    })
+    return [...grouped.values()].filter((item) => item.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [data.finance, search])
+
+  const draft = data.financeBatches.find((batch) => batch.status === 'rascunho' && batch.createdBy === currentUser?.id)
+
+  async function cancelEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    const file = form.get('receipt')
-    const entry: FinanceEntry = {
-      id: makeId('finance'),
-      type: String(form.get('type')) as FinanceEntry['type'],
-      date: String(form.get('date')),
-      amount: Number(form.get('amount')),
-      category: String(form.get('category')),
-      description: String(form.get('description')).trim(),
-      account: String(form.get('account')).trim(),
-      contributor: String(form.get('contributor')).trim() || undefined,
-      createdBy: currentUser?.id ?? '',
-    }
-    let uploadedPath: string | undefined
+    if (!cancelling) return
+    const reason = String(new FormData(event.currentTarget).get('reason')).trim()
+    setSaving(true)
     try {
-      if (file instanceof File && file.size) {
-        entry.receipt = await uploadStoredFile('finance', entry.id, makeId('receipt'), file)
-        entry.receiptName = entry.receipt.name
-        uploadedPath = entry.receipt.storagePath
-      }
-      const saved = await updateData((draft) => draft.finance.unshift(entry), 'financeiro.lancamento_criado', `${entry.type}: ${money.format(entry.amount)} — ${entry.category}`)
-      if (saved) setOpen(false)
-      else await removeStoredFile(uploadedPath)
+      await callSecureMutation({ type: 'finance.entry.cancel', entryId: cancelling.id, reason })
+      setCancelling(null)
     } catch (error) {
-      await removeStoredFile(uploadedPath)
-      window.alert(error instanceof Error ? error.message : 'Não foi possível salvar o lançamento.')
+      window.alert(error instanceof Error ? error.message : 'Não foi possível cancelar a contribuição.')
+    } finally {
+      setSaving(false)
     }
   }
 
-  async function downloadReceipt(entry: FinanceEntry) {
-    if (!entry.receipt) return
-    try {
-      await downloadStoredFile(entry.receipt)
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Não foi possível baixar o comprovante.')
-    }
+  async function exportEntries() {
+    const ExcelJS = await import('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Contribuições')
+    sheet.columns = [
+      { header: 'Data', key: 'date', width: 14 }, { header: 'Pessoa', key: 'person', width: 30 },
+      { header: 'Tipo', key: 'category', width: 16 }, { header: 'Forma', key: 'method', width: 14 },
+      { header: 'Responsável', key: 'owner', width: 28 }, { header: 'Situação', key: 'status', width: 14 },
+      { header: 'Valor', key: 'amount', width: 16 }, { header: 'Motivo do cancelamento', key: 'reason', width: 40 },
+    ]
+    entries.forEach((entry) => sheet.addRow({ date: displayDate(entry.date), person: entry.contributorName, category: entry.category, method: entry.method, owner: entry.createdByName, status: entry.status, amount: entry.amount, reason: entry.cancellationReason }))
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF078B44' } }
+    sheet.getColumn('amount').numFmt = 'R$ #,##0.00'
+    const buffer = await workbook.xlsx.writeBuffer()
+    const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ipcn-contribuicoes-${month}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="page">
-      <PageHeader eyebrow="Tesouraria" title="Financeiro" description="Controle básico de entradas e saídas enquanto as regras definitivas são avaliadas pelo Conselho." actions={canManage && <button className="button primary" onClick={() => setOpen(true)}><Plus size={18} /> Novo lançamento</button>} />
-      <section className="stats-grid finance-stats"><StatCard label="Entradas" value={money.format(income)} helper="No período filtrado" icon={<ArrowDownLeft size={22} />} /><StatCard label="Saídas" value={money.format(expense)} helper="No período filtrado" icon={<ArrowUpRight size={22} />} /><StatCard label="Saldo" value={money.format(income - expense)} helper={`${entries.length} lançamentos`} icon={<CircleDollarSign size={22} />} /></section>
-      <section className="panel table-panel"><div className="table-toolbar"><SearchField value={search} onChange={setSearch} placeholder="Buscar lançamento" /><label className="month-control"><span>Competência</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label></div>{entries.length ? <div className="responsive-table"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th className="amount-column">Valor</th></tr></thead><tbody>{entries.map((entry) => <tr key={entry.id}><td data-label="Data">{displayDate(entry.date)}</td><td data-label="Descrição"><strong>{entry.description}</strong><small>{entry.contributor ?? '—'}</small>{entry.receipt && <button type="button" className="file-link" onClick={() => downloadReceipt(entry)}><FileText size={14} />{entry.receipt.name}</button>}</td><td data-label="Categoria">{entry.category}</td><td data-label="Conta">{entry.account}</td><td data-label="Tipo"><StatusBadge tone={entry.type === 'entrada' ? 'success' : 'danger'}>{entry.type}</StatusBadge></td><td data-label="Valor" className={`amount-column ${entry.type}`}>{entry.type === 'entrada' ? '+' : '−'} {money.format(entry.amount)}</td></tr>)}</tbody></table></div> : <EmptyState title="Nenhum lançamento" description="Não há movimentações para o período e busca selecionados." />}</section>
-      <Modal title="Novo lançamento" description="Registre somente informações confirmadas pela Tesouraria." open={open} onClose={() => setOpen(false)}>
-        <form onSubmit={save}><div className="form-grid two-columns"><div className="field"><span>Tipo *</span><CustomSelect name="type" label="Tipo" defaultValue="entrada" options={[{ value: 'entrada', label: 'Entrada' }, { value: 'saída', label: 'Saída' }]} /></div><Field label="Data *"><input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></Field><Field label="Valor *"><input name="amount" type="number" min="0.01" step="0.01" required /></Field><div className="field"><span>Categoria *</span><CustomSelect name="category" label="Categoria" defaultValue={categories[0]} options={categories.map((item) => ({ value: item, label: item }))} /></div><Field label="Conta *"><input name="account" required defaultValue="Caixa" /></Field><Field label="Contribuinte" hint="Opcional"><input name="contributor" /></Field></div><Field label="Descrição *"><input name="description" required /></Field><FileUploadField label="Comprovante" name="receipt" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp" disabled={!documentUploadsEnabled} emptyTitle="Selecionar comprovante" emptyDescription="PDF, Word ou imagem, até 10 MB" hint={documentUploadsEnabled ? 'O arquivo será protegido no Firebase Storage e vinculado ao lançamento.' : 'O campo será liberado após a ativação segura do Firebase Storage.'} resetKey={open} /><FormActions onCancel={() => setOpen(false)} submitLabel="Salvar lançamento" /></form>
-      </Modal>
+    <div className="page finance-page">
+      <PageHeader eyebrow="Junta Diaconal" title="Financeiro" description="Registre dízimos, ofertas e missões recebidos pela igreja." actions={<div className="finance-header-actions">{draft && <Link className="button secondary" to={`/financeiro/contribuicoes/novo?lote=${draft.id}`}>Continuar rascunho</Link>}<Link className="button primary" to="/financeiro/contribuicoes/novo"><Plus size={18} /> Registrar contribuições</Link></div>} />
+      <div className="finance-tabs" role="tablist" aria-label="Áreas do financeiro"><button type="button" role="tab" aria-selected={tab === 'entries'} className={tab === 'entries' ? 'active' : ''} onClick={() => setTab('entries')}>Lançamentos</button><button type="button" role="tab" aria-selected={tab === 'contributors'} className={tab === 'contributors' ? 'active' : ''} onClick={() => setTab('contributors')}>Contribuintes</button></div>
+      <section className="finance-summary" aria-label="Resumo do mês">
+        <div className="finance-summary-main"><article><span>Total recebido</span><strong>{money.format(total)}</strong><small>{activeEntries.length} contribuições ativas</small></article><article><span>Dízimos</span><strong>{money.format(categoryTotal('Dízimo'))}</strong><small>No período selecionado</small></article><article><span>Ofertas</span><strong>{money.format(categoryTotal('Oferta'))}</strong><small>No período selecionado</small></article><article><span>Missões</span><strong>{money.format(categoryTotal('Missões'))}</strong><small>No período selecionado</small></article></div>
+        <div className="finance-method-summary"><div><span className="finance-method-icon money-icon"><Banknote size={21} /></span><span>Dinheiro</span><strong>{money.format(methodTotal('Dinheiro'))}</strong></div><div><span className="finance-method-icon pix-icon"><PixIcon width={20} height={20} /></span><span>PIX</span><strong>{money.format(methodTotal('PIX'))}</strong></div></div>
+      </section>
+      {tab === 'entries' ? <section className="panel table-panel finance-table-panel">
+        <div className="finance-toolbar"><SearchField value={search} onChange={setSearch} placeholder="Buscar pessoa ou responsável" /><label className="finance-month"><span className="sr-only">Mês</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label><CustomSelect label="Tipo" value={category} onChange={(value) => setCategory(value as typeof category)} options={categories.map((value) => ({ value, label: value }))} /><CustomSelect label="Forma" value={method} onChange={(value) => setMethod(value as typeof method)} options={methods.map((value) => ({ value, label: value }))} /><CustomSelect label="Situação" value={status} onChange={(value) => setStatus(value as typeof status)} options={statuses.map((value) => ({ value, label: value }))} /><button className="button secondary" onClick={exportEntries}><Download size={17} /> Exportar</button></div>
+        {entries.length ? <div className="responsive-table"><table><thead><tr><th>Data</th><th>Pessoa</th><th>Tipo</th><th>Forma</th><th>Responsável</th><th>Situação</th><th className="amount-heading">Valor</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{entries.map((entry) => <tr key={entry.id} className={entry.status === 'cancelado' ? 'finance-row-cancelled' : ''}><td data-label="Data">{displayDate(entry.date)}</td><td data-label="Pessoa"><strong>{entry.contributorName}</strong></td><td data-label="Tipo">{entry.category}</td><td data-label="Forma"><span className="payment-method">{entry.method === 'PIX' ? <PixIcon width={17} height={17} /> : <Banknote size={18} />}{entry.method}</span></td><td data-label="Responsável">{entry.createdByName || accountUsers.find((user) => user.id === entry.createdBy)?.name || 'Não informado'}</td><td data-label="Situação"><StatusBadge tone={entry.status === 'cancelado' ? 'danger' : 'success'}>{entry.status === 'cancelado' ? 'Cancelado' : 'Ativo'}</StatusBadge></td><td data-label="Valor" className="amount-column">{money.format(entry.amount)}</td><td className="row-actions">{entry.status !== 'cancelado' && <button className="icon-button" title="Cancelar contribuição" aria-label={`Cancelar contribuição de ${entry.contributorName}`} onClick={() => setCancelling(entry)}><MoreHorizontal size={19} /></button>}</td></tr>)}</tbody></table></div> : <EmptyState title="Nenhuma contribuição encontrada" description="Ajuste os filtros ou registre um novo lote de contribuições." />}
+      </section> : <section className="panel table-panel finance-table-panel"><div className="finance-toolbar contributors-toolbar"><SearchField value={search} onChange={setSearch} placeholder="Buscar contribuinte" /></div>{contributors.length ? <div className="responsive-table"><table><thead><tr><th>Contribuinte</th><th>Última contribuição</th><th>Quantidade</th><th className="amount-heading">Total histórico</th></tr></thead><tbody>{contributors.map((item) => <tr key={item.name}><td data-label="Contribuinte"><strong>{item.name}</strong></td><td data-label="Última contribuição">{displayDate(item.lastDate)}</td><td data-label="Quantidade">{item.entries}</td><td data-label="Total histórico" className="amount-column">{money.format(item.total)}</td></tr>)}</tbody></table></div> : <EmptyState title="Nenhum contribuinte encontrado" description="Os contribuintes identificados aparecerão aqui após a finalização dos lotes." />}</section>}
+      <Modal title="Cancelar contribuição" description="O registro permanecerá no histórico e deixará de compor os totais." open={Boolean(cancelling)} onClose={() => !saving && setCancelling(null)}><form onSubmit={cancelEntry}>{cancelling && <div className="finance-cancel-summary"><XCircle size={20} /><div><strong>{cancelling.contributorName}</strong><span>{cancelling.category} · {money.format(cancelling.amount)} · {displayDate(cancelling.date)}</span></div></div>}<Field label="Justificativa do cancelamento *" hint="Mínimo de 5 caracteres. Esta justificativa ficará registrada na auditoria."><textarea name="reason" rows={4} minLength={5} maxLength={500} required /></Field><FormActions onCancel={() => setCancelling(null)} submitLabel="Confirmar cancelamento" disabled={saving} /></form></Modal>
     </div>
   )
 }

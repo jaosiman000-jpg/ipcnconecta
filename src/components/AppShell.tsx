@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpenCheck, Building2, ChartNoAxesCombined, CircleDollarSign, ClipboardList,
-  FileSpreadsheet, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, UserRoundSearch, X,
+  ContactRound, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, UserRoundSearch, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -17,6 +17,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: '/', label: 'Visão geral', capability: 'dashboard.view', icon: LayoutDashboard },
+  { to: '/cadastros', label: 'Cadastros', capability: 'people.view', icon: ContactRound },
   { to: '/membros', label: 'Membros', capability: 'members.view', icon: Users },
   { to: '/visitantes', label: 'Visitantes', capability: 'visitors.view', icon: UserRoundSearch },
   { to: '/ebd', label: 'Escola dominical', capability: 'ebd.view', icon: BookOpenCheck },

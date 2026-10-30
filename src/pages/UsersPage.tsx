@@ -7,7 +7,7 @@ import { isSuperuser, ROLE_LABELS, roleSummary } from '../app/permissions'
 import type { Role, User } from '../app/types'
 import { EmptyState, FormActions, Modal, PageHeader, StatusBadge } from '../components/Common'
 
-const roles: Role[] = ['administrador', 'conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']
+const roles: Role[] = ['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
 
 export function UsersPage() {
   const { data } = useApp()

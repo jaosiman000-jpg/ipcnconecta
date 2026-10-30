@@ -2,13 +2,16 @@ export type Role =
   | 'administrador'
   | 'conselho'
   | 'secretaria'
-  | 'tesouraria'
+  | 'diacono'
   | 'professor'
   | 'lider'
   | 'acolhimento'
 
 export type UserStatus = 'ativo' | 'pendente' | 'desativado'
 export type MemberStatus = 'Ativo' | 'Em análise' | 'Disciplinado' | 'Excluído' | 'Falecido'
+export type MembershipType = 'Comungante' | 'Não comungante'
+export type PersonSex = 'Feminino' | 'Masculino'
+export type MaritalStatus = 'Solteiro' | 'Casado' | 'Divorciado' | 'Viúvo'
 export type AttendanceStatus = 'presente' | 'ausente' | 'justificado' | 'visitante'
 
 export interface AttendanceVisitor {
@@ -55,6 +58,8 @@ export interface Member {
   cpf?: string
   email?: string
   status: MemberStatus
+  memberNumber?: number
+  membershipType?: MembershipType
   restrictedNotes?: string
   documents: MemberDocument[]
   createdAt: string
@@ -119,18 +124,98 @@ export interface SocietyRequest {
   reviewedBy?: string
 }
 
+export type ContributionCategory = 'Dízimo' | 'Oferta' | 'Missões'
+export type PaymentMethod = 'Dinheiro' | 'PIX'
+export type ContributionStatus = 'ativo' | 'cancelado'
+
+export interface Person {
+  id: string
+  name: string
+  birthDate?: string
+  phone?: string
+  homePhone?: string
+  email?: string
+  sex?: PersonSex
+  address?: {
+    street?: string
+    numberComplement?: string
+    neighborhood?: string
+    city?: string
+    postalCode?: string
+  }
+  nationality?: string
+  birthCity?: string
+  birthState?: string
+  maritalStatus?: MaritalStatus
+  fatherName?: string
+  fatherIsMember?: boolean
+  motherName?: string
+  motherIsMember?: boolean
+  ebd?: {
+    registrationNumber?: number
+    classId?: string
+    className?: string
+    enrolledAt?: string
+    professor: boolean
+    status: 'ativo' | 'inativo'
+  }
+  membership?: {
+    memberNumber?: number
+    type: MembershipType
+    status: MemberStatus
+    joinedAt?: string
+  }
+  tither: boolean
+  status: 'ativo' | 'arquivado' | 'falecido'
+  source?: 'manual' | 'ipcn-ebd-import'
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type PersonInput = Omit<Person, 'createdAt' | 'updatedAt'>
+
+export interface ContributionBatchItem {
+  id: string
+  amount: number
+  category: ContributionCategory
+  method: PaymentMethod
+  personId?: string
+  contributorName: string
+  anonymous: boolean
+}
+
+export interface ContributionBatch {
+  id: string
+  date: string
+  status: 'rascunho' | 'finalizado' | 'descartado'
+  items: ContributionBatchItem[]
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  finalizedAt?: string
+  itemCount?: number
+  total?: number
+}
+
 export interface FinanceEntry {
   id: string
-  type: 'entrada' | 'saída'
+  batchId: string
   date: string
   amount: number
-  category: string
-  description: string
-  account: string
-  contributor?: string
-  receiptName?: string
-  receipt?: MemberDocument
+  category: ContributionCategory
+  method: PaymentMethod
+  personId?: string
+  contributorName: string
+  anonymous: boolean
+  status: ContributionStatus
   createdBy: string
+  createdByName: string
+  createdAt: string
+  cancelledAt?: string
+  cancelledBy?: string
+  cancelledByName?: string
+  cancellationReason?: string
 }
 
 export interface AuditEntry {
@@ -154,6 +239,8 @@ export interface AppData {
   attendance: AttendanceSession[]
   societies: Society[]
   societyRequests: SocietyRequest[]
+  people: Person[]
+  financeBatches: ContributionBatch[]
   finance: FinanceEntry[]
   audit: AuditEntry[]
   settings: AppSettings

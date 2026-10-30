@@ -9,7 +9,7 @@ import type { Role } from '../app/types'
 import { CustomSelect, Field, FormActions, Modal } from '../components/Common'
 import { ProfilePhotoField } from '../components/ProfilePhotoField'
 
-const requestableRoles: Role[] = ['conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']
+const requestableRoles: Role[] = ['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
 
 export function LoginPage() {
   const { data } = useApp()

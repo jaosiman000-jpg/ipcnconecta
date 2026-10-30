@@ -31,19 +31,25 @@ flowchart LR
 ## Coleções principais
 
 - `users`: perfis, papéis e escopos.
-- `members`: dados gerais dos membros.
-- `memberDirectory`: diretório mínimo para professores e líderes.
+- `people`: cadastro mestre; cada pessoa pode possuir vínculos independentes com membros, EBD e dízimos.
+- `members`: projeção dos dados gerais das pessoas oficialmente recebidas como membros.
+- `memberDirectory`: diretório mínimo de membros para os fluxos das sociedades.
 - `memberPrivate`: observações e documentos pastorais restritos.
 - `visitors`: cadastro e acompanhamento de visitantes.
 - `ebdClasses` e `attendance`: classes e chamadas da EBD.
 - `societies` e `societyRequests`: sociedades e pedidos de inclusão.
-- `financeEntries`: lançamentos financeiros.
+- `ebdDirectory`: diretório mínimo dos alunos, consultado por professores somente nas classes atribuídas.
+- `financeDirectory`: diretório mínimo de contribuintes disponível para a Junta Diaconal.
+- `financeBatches`: rascunhos e metadados dos lotes de contribuições.
+- `financeEntries`: contribuições finalizadas e cancelamentos preservados no histórico.
 - `audit`: histórico imutável de ações.
 - `appSettings/general`: configurações gerais.
+- `systemCounters/people`: próximas sequências de matrícula EBD e número de membro.
+- `dataImports`: marcadores técnicos que impedem a repetição de importações.
 
 ## Autorização
 
-Administrador e Conselho são superusuários. Secretaria, Tesouraria, Professor, Líder e Acolhimento recebem apenas os módulos necessários. Papéis são cumulativos. Classes e sociedades também possuem escopos próprios.
+Administrador e Conselho são superusuários. Secretaria, Junta Diaconal, Professor, Líder e Acolhimento recebem apenas os módulos necessários. Papéis são cumulativos. Classes e sociedades também possuem escopos próprios.
 
 ## CI/CD
 

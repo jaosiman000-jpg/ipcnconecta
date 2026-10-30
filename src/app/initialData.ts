@@ -21,6 +21,8 @@ export function createInitialData(): AppData {
     attendance: [],
     societies: structuredClone(societies),
     societyRequests: [],
+    people: [],
+    financeBatches: [],
     finance: [],
     audit: [],
     settings: { whatsappMessage: defaultWhatsappMessage },

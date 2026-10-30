@@ -30,9 +30,9 @@ service firebase.storage {
     }
 
     match /finance/{entryId}/{fileName} {
-      allow read: if hasRole(['administrador', 'conselho', 'tesouraria']);
-      allow create, update: if hasRole(['administrador', 'conselho', 'tesouraria']) && validUpload();
-      allow delete: if hasRole(['administrador', 'conselho', 'tesouraria']);
+      allow read: if hasRole(['administrador', 'conselho', 'diacono']);
+      allow create, update: if hasRole(['administrador', 'conselho', 'diacono']) && validUpload();
+      allow delete: if hasRole(['administrador', 'conselho', 'diacono']);
     }
 
     match /{allPaths=**} {

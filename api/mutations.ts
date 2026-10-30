@@ -1,4 +1,4 @@
-import { Timestamp, type DocumentData, type Firestore, type WriteBatch } from 'firebase-admin/firestore'
+import { Timestamp, type DocumentData, type DocumentReference, type Firestore, type WriteBatch } from 'firebase-admin/firestore'
 import { AdminSetupError, getAdminServices } from './_lib/firebaseAdmin.js'
 import { ApiError, assertSameOrigin, authenticate, isSuperuser, json, parseMutation, readBearerToken, requireRole, type Actor } from './_lib/security.js'
 import type { MutationInput, Role } from './_lib/schemas.js'
@@ -8,12 +8,12 @@ const MEMBER_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES, 'secretaria']
 const VISITOR_ROLES: Role[] = [...MEMBER_MANAGER_ROLES, 'acolhimento']
 const EBD_MANAGER_ROLES: Role[] = [...MEMBER_MANAGER_ROLES]
 const SOCIETY_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES]
-const FINANCE_ROLES: Role[] = [...SUPERUSER_ROLES, 'tesouraria']
+const FINANCE_ROLES: Role[] = [...SUPERUSER_ROLES, 'diacono']
 const ROLE_LABELS: Record<Role, string> = {
   administrador: 'Administrador',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
-  tesouraria: 'Tesouraria',
+  diacono: 'Junta Diaconal',
   professor: 'Professor',
   lider: 'Líder de sociedade',
   acolhimento: 'Acolhimento',
@@ -43,10 +43,6 @@ function addAudit(batch: WriteBatch, db: Firestore, actor: Actor, result: AuditR
   })
 }
 
-function storedFilePathIsValid(file: { storagePath?: string } | undefined, prefix: string) {
-  return !file || Boolean(file.storagePath?.startsWith(prefix))
-}
-
 function profileRoles(data: DocumentData | undefined) {
   return Array.isArray(data?.roles) ? data.roles.map(String) : []
 }
@@ -56,39 +52,221 @@ function activeSuperuser(data: DocumentData | undefined) {
   return data?.status === 'ativo' && roles.some((role) => SUPERUSER_ROLES.includes(role as Role))
 }
 
-async function saveMember(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'member.save' }>) {
-  requireRole(actor, MEMBER_MANAGER_ROLES)
-  const item = input.member
-  if (!isSuperuser(actor) && (item.restrictedNotes || item.documents.length)) {
-    throw new ApiError(403, 'restricted_member_data', 'Somente Conselho e Administradores podem alterar a área pastoral restrita.')
-  }
-  if (item.documents.some((file) => !storedFilePathIsValid(file, `members/${item.id}/`))) {
-    throw new ApiError(400, 'invalid_storage_path', 'Um anexo possui vínculo inválido.')
-  }
+function normalizedName(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
 
-  const memberRef = db.collection('members').doc(item.id)
-  const existing = await memberRef.get()
-  const batch = db.batch()
-  const createdAt = existing.data()?.createdAt ?? Timestamp.now()
-  const { restrictedNotes, documents, ...publicData } = item
-  batch.set(memberRef, clean({ ...publicData, createdAt }))
-  batch.set(db.collection('memberDirectory').doc(item.id), {
+type PersonPayload = Extract<MutationInput, { type: 'person.save' }>['person'] | Extract<MutationInput, { type: 'people.import' }>['people'][number]
+
+function ebdDirectoryData(item: PersonPayload) {
+  return clean({
     id: item.id,
     name: item.name,
     birthDate: item.birthDate,
+    phone: item.phone,
     status: item.status,
+    ebd: item.ebd,
+    tither: false,
   })
-  if (isSuperuser(actor)) {
-    batch.set(db.collection('memberPrivate').doc(item.id), clean({
-      id: item.id,
-      restrictedNotes,
-      documents,
-    }))
+}
+
+function financeDirectoryData(item: PersonPayload) {
+  return clean({
+    id: item.id,
+    name: item.name,
+    status: item.status,
+    tither: item.tither,
+  })
+}
+
+function adultOn(date: string, now = new Date()) {
+  const [year, month, day] = date.split('-').map(Number)
+  const eighteenth = new Date(Date.UTC(year + 18, month - 1, day))
+  return eighteenth.getTime() <= now.getTime()
+}
+
+function membershipSignature(value: Record<string, unknown> | undefined) {
+  if (!value) return ''
+  return JSON.stringify({
+    memberNumber: Number(value.memberNumber ?? 0),
+    type: value.type ?? '',
+    status: value.status ?? '',
+    joinedAt: value.joinedAt ?? '',
+  })
+}
+
+async function savePerson(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'person.save' }>) {
+  requireRole(actor, MEMBER_MANAGER_ROLES)
+  const item = input.person
+  const personRef = db.collection('people').doc(item.id)
+  const counterRef = db.collection('systemCounters').doc('people')
+  let result: AuditResult | undefined
+
+  await db.runTransaction(async (transaction) => {
+    const [existing, counter] = await Promise.all([transaction.get(personRef), transaction.get(counterRef)])
+    const previous = existing.data() ?? {}
+    const oldMembership = previous.membership as Record<string, unknown> | undefined
+    if (!isSuperuser(actor) && membershipSignature(item.membership as Record<string, unknown> | undefined) !== membershipSignature(oldMembership)) {
+      throw new ApiError(403, 'membership_permission_denied', 'Somente Conselho e Administradores podem alterar o vínculo de membro.')
+    }
+    if (!existing.exists) {
+      if (!item.birthDate || !item.sex) throw new ApiError(400, 'person_required_fields', 'Informe nome, nascimento e sexo.')
+      if (!item.ebd && !item.membership && !item.tither) throw new ApiError(400, 'person_module_required', 'Selecione EBD, Membro ou Dizimista.')
+      if (adultOn(item.birthDate) && !item.phone) throw new ApiError(400, 'adult_phone_required', 'Informe o celular da pessoa adulta.')
+      if (item.ebd && !item.ebd.classId && !item.ebd.professor) throw new ApiError(400, 'ebd_class_required', 'Selecione a classe da EBD.')
+    }
+
+    const oldEbd = previous.ebd as Record<string, unknown> | undefined
+    const counters = counter.data() ?? {}
+    let nextEbd = Number(counters.nextEbdRegistrationNumber ?? 1)
+    let nextMember = Number(counters.nextMemberNumber ?? 1)
+    const nextEbdData = item.ebd ? { ...item.ebd, registrationNumber: Number(oldEbd?.registrationNumber ?? nextEbd) } : oldEbd
+    if (item.ebd && !oldEbd?.registrationNumber) nextEbd += 1
+    const nextMembership = item.membership ? { ...item.membership, memberNumber: Number(oldMembership?.memberNumber ?? nextMember) } : oldMembership
+    if (item.membership && !oldMembership?.memberNumber) nextMember += 1
+
+    const classIds = [...new Set([String(oldEbd?.classId ?? ''), String(nextEbdData?.classId ?? '')].filter(Boolean))]
+    const classSnapshots = await Promise.all(classIds.map((classId) => transaction.get(db.collection('ebdClasses').doc(classId))))
+    if (nextEbdData?.classId && !classSnapshots.find((snapshot) => snapshot.id === nextEbdData.classId)?.exists) {
+      throw new ApiError(400, 'ebd_class_invalid', 'A classe selecionada não existe.')
+    }
+
+    const now = Timestamp.now()
+    const saved = clean({
+      ...item,
+      ebd: nextEbdData,
+      membership: nextMembership,
+      source: previous.source ?? item.source ?? 'manual',
+      createdAt: previous.createdAt ?? now,
+      updatedAt: now,
+    })
+    transaction.set(personRef, saved)
+    if (nextEbdData) transaction.set(db.collection('ebdDirectory').doc(item.id), ebdDirectoryData(saved as typeof item))
+    else transaction.delete(db.collection('ebdDirectory').doc(item.id))
+    if (item.tither) transaction.set(db.collection('financeDirectory').doc(item.id), financeDirectoryData(saved as typeof item))
+    else transaction.delete(db.collection('financeDirectory').doc(item.id))
+    transaction.set(counterRef, { nextEbdRegistrationNumber: nextEbd, nextMemberNumber: nextMember, updatedAt: now }, { merge: true })
+
+    classSnapshots.forEach((snapshot) => {
+      const studentIds = new Set(Array.isArray(snapshot.data()?.studentIds) ? snapshot.data()!.studentIds.map(String) : [])
+      studentIds.delete(item.id)
+      if (snapshot.id === nextEbdData?.classId && nextEbdData.status === 'ativo') studentIds.add(item.id)
+      transaction.set(snapshot.ref, { studentIds: [...studentIds] }, { merge: true })
+    })
+
+    if (nextMembership) {
+      const address = [item.address?.street, item.address?.numberComplement, item.address?.neighborhood, item.address?.city, item.address?.postalCode].filter(Boolean).join(', ')
+      const memberData = clean({
+        id: item.id,
+        name: item.name,
+        birthDate: item.birthDate ?? '',
+        phone: item.phone ?? '',
+        address: address || undefined,
+        email: item.email,
+        status: nextMembership.status,
+        memberNumber: nextMembership.memberNumber,
+        membershipType: nextMembership.type,
+        createdAt: previous.createdAt ?? now,
+      })
+      transaction.set(db.collection('members').doc(item.id), memberData, { merge: true })
+      transaction.set(db.collection('memberDirectory').doc(item.id), clean({ id: item.id, name: item.name, birthDate: item.birthDate ?? '', status: nextMembership.status, memberNumber: nextMembership.memberNumber, membershipType: nextMembership.type }), { merge: true })
+    }
+
+    result = { action: existing.exists ? 'pessoa.atualizada' : 'pessoa.criada', detail: item.name, targetId: item.id }
+    transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: now })
+  })
+  return result!
+}
+
+async function importPeople(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'people.import' }>) {
+  requireRole(actor, SUPERUSER_ROLES)
+  if (input.importId !== 'ipcn-ebd-2026-10-30' || input.people.length !== 210) {
+    throw new ApiError(400, 'import_invalid', 'A importação não corresponde ao banco validado da EBD.')
   }
-  const result = { action: existing.exists ? 'membro.atualizado' : 'membro.criado', detail: item.name, targetId: item.id }
+  input.people.forEach((person, index) => {
+    const registrationNumber = index + 1
+    if (person.id !== `person-ipcn-${String(registrationNumber).padStart(4, '0')}` || person.ebd?.registrationNumber !== registrationNumber || person.membership || normalizedName(person.ebd?.className ?? '') === 'licenciados') {
+      throw new ApiError(400, 'import_invalid', 'A ordem ou o conteúdo da importação foi alterado.')
+    }
+  })
+
+  const markerRef = db.collection('dataImports').doc(input.importId)
+  const counterRef = db.collection('systemCounters').doc('people')
+  const personRefs = input.people.map((person) => db.collection('people').doc(person.id))
+  const existingClasses = await db.collection('ebdClasses').get()
+  const classesByName = new Map(existingClasses.docs.map((entry) => [normalizedName(String(entry.data().name ?? '')), entry.ref]))
+  const classAliases = new Map([['cordeirinhos do senhor', 'cordeirinhos']])
+  const importedByClass = new Map<string, string[]>()
+  const classRefs = new Map<string, DocumentReference>()
+
+  input.people.forEach((person) => {
+    const className = person.ebd?.className
+    if (!className) return
+    const key = normalizedName(className)
+    const matchKey = classAliases.get(key) ?? key
+    const ref = classesByName.get(key) ?? classesByName.get(matchKey) ?? db.collection('ebdClasses').doc(`ebd-import-${key.replace(/ /g, '-').slice(0, 80)}`)
+    classRefs.set(key, ref)
+    importedByClass.set(ref.id, [...(importedByClass.get(ref.id) ?? []), person.id])
+  })
+
+  let result: AuditResult | undefined
+  await db.runTransaction(async (transaction) => {
+    const refsToRead = [markerRef, counterRef, ...classRefs.values(), ...personRefs]
+    const snapshots = await transaction.getAll(...refsToRead)
+    const marker = snapshots[0]
+    const counter = snapshots[1]
+    if (marker.data()?.status === 'completed') throw new ApiError(409, 'import_already_completed', 'Esta planilha já foi importada.')
+    if (marker.data()?.status === 'processing') return
+    if (snapshots.slice(2 + classRefs.size).some((snapshot) => snapshot.exists)) throw new ApiError(409, 'import_person_conflict', 'A importação encontrou cadastros já existentes.')
+
+    const classSnapshots = snapshots.slice(2, 2 + classRefs.size)
+    const classSnapshotById = new Map(classSnapshots.map((snapshot) => [snapshot.id, snapshot]))
+    const now = Timestamp.now()
+    input.people.forEach((raw) => {
+      const className = raw.ebd?.className
+      const classKey = className ? normalizedName(className) : ''
+      const classRef = classKey ? classRefs.get(classKey) : undefined
+      const resolvedClassName = classRef ? String(classSnapshotById.get(classRef.id)?.data()?.name ?? className) : undefined
+      const person = clean({
+        ...raw,
+        ebd: raw.ebd ? { ...raw.ebd, classId: classRef?.id, className: resolvedClassName } : undefined,
+        createdAt: now,
+        updatedAt: now,
+      })
+      transaction.create(db.collection('people').doc(raw.id), person)
+      transaction.create(db.collection('ebdDirectory').doc(raw.id), ebdDirectoryData(person as typeof raw))
+    })
+
+    classRefs.forEach((ref, key) => {
+      const snapshot = classSnapshotById.get(ref.id)
+      const studentIds = new Set(Array.isArray(snapshot?.data()?.studentIds) ? snapshot!.data()!.studentIds.map(String) : [])
+      ;(importedByClass.get(ref.id) ?? []).forEach((personId) => studentIds.add(personId))
+      const sourceName = input.people.find((person) => normalizedName(person.ebd?.className ?? '') === key)?.ebd?.className ?? key
+      transaction.set(ref, { id: ref.id, name: snapshot?.data()?.name ?? sourceName, description: snapshot?.data()?.description ?? '', teacherIds: snapshot?.data()?.teacherIds ?? [], studentIds: [...studentIds], active: true }, { merge: true })
+    })
+
+    const highestRegistration = Math.max(...input.people.map((person) => Number(person.ebd?.registrationNumber ?? 0)))
+    transaction.set(counterRef, {
+      nextEbdRegistrationNumber: Math.max(Number(counter.data()?.nextEbdRegistrationNumber ?? 1), highestRegistration + 1),
+      nextMemberNumber: Math.max(Number(counter.data()?.nextMemberNumber ?? 1), 1),
+      updatedAt: now,
+    }, { merge: true })
+    transaction.create(markerRef, { id: input.importId, count: input.people.length, source: 'BANCO IPCN (1).xlsx', status: 'processing', importedAt: now, importedBy: actor.id })
+  })
+
+  const storedPeople = await db.getAll(...personRefs)
+  if (storedPeople.some((snapshot) => !snapshot.exists)) throw new ApiError(409, 'import_incomplete', 'A primeira etapa da importação não foi concluída.')
+  const batch = db.batch()
+  storedPeople.forEach((snapshot) => {
+    const person = snapshot.data() as PersonPayload
+    if (person.tither) batch.set(db.collection('financeDirectory').doc(snapshot.id), financeDirectoryData(person))
+  })
+  const completedAt = Timestamp.now()
+  result = { action: 'pessoas.importadas', detail: `${input.people.length} cadastros da EBD`, targetId: input.importId }
+  batch.update(markerRef, { status: 'completed', completedAt })
   addAudit(batch, db, actor, result)
   await batch.commit()
-  return result
+  return result!
 }
 
 async function saveVisitor(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'visitor.save' }>) {
@@ -133,17 +311,21 @@ async function saveClass(db: Firestore, actor: Actor, input: Extract<MutationInp
   requireRole(actor, EBD_MANAGER_ROLES)
   const item = input.item
   const userRefs = item.teacherIds.map((id) => db.collection('users').doc(id))
-  const memberRefs = item.studentIds.map((id) => db.collection('members').doc(id))
+  const memberRefs = item.studentIds.map((id) => db.collection('people').doc(id))
   const [teachers, students, allUsers, existing] = await Promise.all([
     userRefs.length ? db.getAll(...userRefs) : [],
     memberRefs.length ? db.getAll(...memberRefs) : [],
     db.collection('users').get(),
     db.collection('ebdClasses').doc(item.id).get(),
   ])
+  const existingStudents = existing.exists && Array.isArray(existing.data()?.studentIds) ? existing.data()!.studentIds.map(String).sort() : []
+  if (JSON.stringify([...item.studentIds].sort()) !== JSON.stringify(existingStudents)) {
+    throw new ApiError(403, 'student_assignment_denied', 'As matrículas devem ser alteradas pelo cadastro da pessoa.')
+  }
   if (teachers.some((entry) => !entry.exists || entry.data()?.status !== 'ativo' || !profileRoles(entry.data()).some((role) => ['professor', ...SUPERUSER_ROLES].includes(role)))) {
     throw new ApiError(400, 'invalid_teacher', 'Selecione somente professores ativos.')
   }
-  if (students.some((entry) => !entry.exists || ['Excluído', 'Falecido'].includes(String(entry.data()?.status)))) {
+  if (students.some((entry) => !entry.exists || entry.data()?.status !== 'ativo' || entry.data()?.ebd?.status !== 'ativo')) {
     throw new ApiError(400, 'invalid_student', 'Um aluno selecionado não está disponível para matrícula.')
   }
   if (allUsers.size > 400) throw new ApiError(409, 'user_limit', 'A atualização excede o limite seguro de usuários.')
@@ -298,17 +480,111 @@ async function reviewSocietyRequest(db: Firestore, actor: Actor, input: Extract<
   return result!
 }
 
-async function createFinanceEntry(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.create' }>) {
+async function canonicalContributionItems(db: Firestore, items: Extract<MutationInput, { type: 'finance.batch.save' }>['batch']['items']) {
+  const personIds = [...new Set(items.flatMap((item) => item.personId ? [item.personId] : []))]
+  const snapshots = personIds.length ? await db.getAll(...personIds.map((personId) => db.collection('financeDirectory').doc(personId))) : []
+  const people = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot.data()]))
+  return items.map((item) => {
+    if (item.anonymous) return { ...item, contributorName: 'Anônimo', personId: undefined }
+    const person = item.personId ? people.get(item.personId) : undefined
+    if (!person || person.status !== 'ativo' || person.tither !== true) throw new ApiError(400, 'contributor_unavailable', 'Selecione um dizimista ativo para a contribuição.')
+    return { ...item, contributorName: String(person.name ?? '').slice(0, 120) }
+  })
+}
+
+async function saveFinanceBatch(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.batch.save' }>) {
   requireRole(actor, FINANCE_ROLES)
-  const item = input.entry
-  if (!storedFilePathIsValid(item.receipt, `finance/${item.id}/`)) throw new ApiError(400, 'invalid_storage_path', 'O comprovante possui vínculo inválido.')
-  const ref = db.collection('financeEntries').doc(item.id)
-  if ((await ref.get()).exists) throw new ApiError(409, 'finance_id_conflict', 'Não foi possível registrar o lançamento. Tente novamente.')
-  const batch = db.batch()
-  batch.set(ref, clean({ ...item, createdBy: actor.id }))
-  const result = { action: 'financeiro.lancamento_criado', detail: `${item.type}: ${item.category}`, targetId: item.id }
-  addAudit(batch, db, actor, result)
-  await batch.commit()
+  const ref = db.collection('financeBatches').doc(input.batch.id)
+  const items = await canonicalContributionItems(db, input.batch.items)
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(ref)
+    if (existing.exists && (existing.data()?.createdBy !== actor.id || existing.data()?.status !== 'rascunho')) {
+      throw new ApiError(409, 'finance_batch_locked', 'Este lote não pode mais ser alterado.')
+    }
+    const now = Timestamp.now()
+    transaction.set(ref, clean({
+      id: input.batch.id,
+      date: input.batch.date,
+      items,
+      status: 'rascunho',
+      createdBy: actor.id,
+      createdByName: actor.name,
+      createdAt: existing.data()?.createdAt ?? now,
+      updatedAt: now,
+    }))
+  })
+  return { action: 'financeiro.lote_salvo', detail: `${items.length} contribuição(ões)`, targetId: input.batch.id }
+}
+
+async function finalizeFinanceBatch(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.batch.finalize' }>) {
+  requireRole(actor, FINANCE_ROLES)
+  let result: AuditResult | undefined
+  await db.runTransaction(async (transaction) => {
+    const ref = db.collection('financeBatches').doc(input.batchId)
+    const snapshot = await transaction.get(ref)
+    if (!snapshot.exists) throw new ApiError(404, 'finance_batch_not_found', 'Lote não encontrado.')
+    const data = snapshot.data() ?? {}
+    if (data.createdBy !== actor.id) throw new ApiError(403, 'finance_batch_owner', 'Somente quem criou o lote pode finalizá-lo.')
+    if (data.status !== 'rascunho') throw new ApiError(409, 'finance_batch_locked', 'Este lote já foi encerrado.')
+    const items = Array.isArray(data.items) ? data.items : []
+    if (!items.length) throw new ApiError(400, 'finance_batch_empty', 'Adicione pelo menos uma contribuição antes de finalizar.')
+    const now = Timestamp.now()
+    let total = 0
+    items.forEach((raw) => {
+      const item = raw as Record<string, unknown>
+      const amount = Number(item.amount)
+      total += amount
+      const entryId = `${input.batchId}_${String(item.id)}`
+      transaction.create(db.collection('financeEntries').doc(entryId), clean({
+        id: entryId,
+        batchId: input.batchId,
+        date: data.date,
+        amount,
+        category: item.category,
+        method: item.method,
+        personId: item.personId,
+        contributorName: item.contributorName,
+        anonymous: item.anonymous === true,
+        status: 'ativo',
+        createdBy: actor.id,
+        createdByName: actor.name,
+        createdAt: now,
+      }))
+    })
+    transaction.update(ref, { status: 'finalizado', finalizedAt: now, updatedAt: now, itemCount: items.length, total, items: [] })
+    result = { action: 'financeiro.lote_finalizado', detail: `${items.length} contribuição(ões)`, targetId: input.batchId }
+    transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: now })
+  })
+  return result!
+}
+
+async function discardFinanceBatch(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.batch.discard' }>) {
+  requireRole(actor, FINANCE_ROLES)
+  const ref = db.collection('financeBatches').doc(input.batchId)
+  const result = { action: 'financeiro.lote_descartado', detail: 'Rascunho descartado', targetId: input.batchId }
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref)
+    if (!snapshot.exists) throw new ApiError(404, 'finance_batch_not_found', 'Lote não encontrado.')
+    if (snapshot.data()?.createdBy !== actor.id || snapshot.data()?.status !== 'rascunho') throw new ApiError(409, 'finance_batch_locked', 'Este lote não pode ser descartado.')
+    const now = Timestamp.now()
+    transaction.update(ref, { status: 'descartado', items: [], updatedAt: now })
+    transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: now })
+  })
+  return result
+}
+
+async function cancelFinanceEntry(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.entry.cancel' }>) {
+  requireRole(actor, FINANCE_ROLES)
+  const ref = db.collection('financeEntries').doc(input.entryId)
+  const result = { action: 'financeiro.contribuicao_cancelada', detail: input.reason, targetId: input.entryId }
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref)
+    if (!snapshot.exists) throw new ApiError(404, 'finance_entry_not_found', 'Contribuição não encontrada.')
+    if (snapshot.data()?.status !== 'ativo') throw new ApiError(409, 'finance_entry_cancelled', 'Esta contribuição já foi cancelada.')
+    const now = Timestamp.now()
+    transaction.update(ref, { status: 'cancelado', cancelledAt: now, cancelledBy: actor.id, cancelledByName: actor.name, cancellationReason: input.reason })
+    transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: now })
+  })
   return result
 }
 
@@ -448,7 +724,8 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
 async function executeMutation(input: MutationInput, actor: Actor, services: ReturnType<typeof getAdminServices>) {
   const { db, auth } = services
   switch (input.type) {
-    case 'member.save': return saveMember(db, actor, input)
+    case 'person.save': return savePerson(db, actor, input)
+    case 'people.import': return importPeople(db, actor, input)
     case 'visitor.save': return saveVisitor(db, actor, input)
     case 'visitor.contact': return contactVisitor(db, actor, input)
     case 'ebd.class.save': return saveClass(db, actor, input)
@@ -456,7 +733,10 @@ async function executeMutation(input: MutationInput, actor: Actor, services: Ret
     case 'society.save': return saveSociety(db, actor, input)
     case 'society.request.create': return createSocietyRequest(db, actor, input)
     case 'society.request.review': return reviewSocietyRequest(db, actor, input)
-    case 'finance.create': return createFinanceEntry(db, actor, input)
+    case 'finance.batch.save': return saveFinanceBatch(db, actor, input)
+    case 'finance.batch.finalize': return finalizeFinanceBatch(db, actor, input)
+    case 'finance.batch.discard': return discardFinanceBatch(db, actor, input)
+    case 'finance.entry.cancel': return cancelFinanceEntry(db, actor, input)
     case 'settings.update': return updateSettings(db, actor, input)
     case 'user.profile.update': return updateOwnProfile(db, actor, input)
     case 'user.access.save': return saveUserAccess(db, actor, input, auth)

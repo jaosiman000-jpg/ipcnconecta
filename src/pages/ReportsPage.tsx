@@ -43,7 +43,7 @@ export function ReportsPage() {
         ...(session.visitors ?? []).map((visitor) => ({ Classe: data.classes.find((item) => item.id === session.classId)?.name, Data: session.date, Aluno: visitor.name, Telefone: visitor.phone, Presença: 'visitante' })),
       ]))
       if (key === 'societies' || key === 'all') addSheet('Sociedades', data.societies.flatMap((society) => society.memberIds.map((memberId) => ({ Sociedade: society.code, Nome: data.members.find((item) => item.id === memberId)?.name, 'Idade mínima': society.minAge, 'Idade máxima': society.maxAge }))))
-      if (key === 'finance' || key === 'all') addSheet('Financeiro', data.finance.map((item) => ({ Data: item.date, Tipo: item.type, Valor: item.amount, Categoria: item.category, Descrição: item.description, Conta: item.account, Contribuinte: item.contributor, Comprovante: item.receiptName })))
+      if (key === 'finance' || key === 'all') addSheet('Financeiro', data.finance.map((item) => ({ Data: item.date, Pessoa: item.contributorName, Categoria: item.category, Forma: item.method, Valor: item.amount, Situação: item.status, Responsável: item.createdByName, 'Motivo do cancelamento': item.cancellationReason })))
       const buffer = await workbook.xlsx.writeBuffer()
       const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
       const link = document.createElement('a')

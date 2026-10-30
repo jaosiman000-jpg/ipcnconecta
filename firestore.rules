@@ -63,14 +63,14 @@ service cloud.firestore {
     }
 
     function financeTeam() {
-      return hasRole(['administrador', 'conselho', 'tesouraria']);
+      return hasRole(['administrador', 'conselho', 'diacono']);
     }
 
     function validRequestedRoles(roles) {
       return roles is list
         && roles.size() > 0
         && roles.size() <= 6
-        && roles.hasOnly(['conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']);
+        && roles.hasOnly(['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']);
     }
 
     function validStrings(values) {
@@ -158,6 +158,27 @@ service cloud.firestore {
 
     match /financeEntries/{entryId} {
       allow read: if financeTeam();
+      allow create, update, delete: if false;
+    }
+
+    match /financeDirectory/{personId} {
+      allow read: if financeTeam();
+      allow create, update, delete: if false;
+    }
+
+    match /ebdDirectory/{personId} {
+      allow read: if ebdManager()
+        || (hasRole(['professor']) && resource.data.ebd.classId in ownProfile().classIds);
+      allow create, update, delete: if false;
+    }
+
+    match /financeBatches/{batchId} {
+      allow read: if financeTeam();
+      allow create, update, delete: if false;
+    }
+
+    match /people/{personId} {
+      allow read: if memberManager();
       allow create, update, delete: if false;
     }
 

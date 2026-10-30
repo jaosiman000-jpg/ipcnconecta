@@ -1,8 +1,9 @@
 import { firebaseAuth } from './firebase'
-import type { AttendanceSession, EbdClass, FinanceEntry, Member, Role, Society, Visitor } from './types'
+import type { AttendanceSession, ContributionBatchItem, EbdClass, PersonInput, Role, Society, Visitor } from './types'
 
 export type SecureMutation =
-  | { type: 'member.save'; member: Member }
+  | { type: 'person.save'; person: PersonInput }
+  | { type: 'people.import'; importId: string; people: PersonInput[] }
   | { type: 'visitor.save'; visitor: Visitor }
   | { type: 'visitor.contact'; visitorId: string }
   | { type: 'ebd.class.save'; item: EbdClass }
@@ -10,7 +11,10 @@ export type SecureMutation =
   | { type: 'society.save'; item: Society }
   | { type: 'society.request.create'; id: string; societyId: string; memberId: string }
   | { type: 'society.request.review'; requestId: string; approved: boolean }
-  | { type: 'finance.create'; entry: FinanceEntry }
+  | { type: 'finance.batch.save'; batch: { id: string; date: string; items: ContributionBatchItem[] } }
+  | { type: 'finance.batch.finalize'; batchId: string }
+  | { type: 'finance.batch.discard'; batchId: string }
+  | { type: 'finance.entry.cancel'; entryId: string; reason: string }
   | { type: 'settings.update'; whatsappMessage: string }
   | { type: 'user.profile.update'; name: string; photo?: string }
   | { type: 'user.access.save'; userId: string; roles: Role[]; classIds: string[]; societyIds: string[] }

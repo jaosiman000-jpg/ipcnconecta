@@ -4,7 +4,7 @@ import { makeId, useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
 import { ageFromBirthDate, displayDate, localIsoDate } from '../app/format'
 import { hasCapability, visibleClassIds } from '../app/permissions'
-import type { AttendanceSession, AttendanceStatus, AttendanceVisitor, EbdClass, Member } from '../app/types'
+import type { AttendanceSession, AttendanceStatus, AttendanceVisitor, EbdClass, Person } from '../app/types'
 import { EmptyState, Field, FormActions, Modal, PageHeader, StatusBadge } from '../components/Common'
 
 const attendanceOptions: { value: AttendanceStatus; label: string }[] = [
@@ -37,7 +37,7 @@ export function EbdPage() {
   const canManage = hasCapability(currentUser, 'ebd.manage')
   const canTakeAttendance = hasCapability(currentUser, 'ebd.attendance')
   const selectedClass = availableClasses.find((item) => item.id === selectedId)
-  const students = (selectedClass?.studentIds.map((id) => data.members.find((member) => member.id === id)).filter(Boolean) ?? []) as Member[]
+  const students = (selectedClass?.studentIds.map((id) => data.people.find((person) => person.id === id)).filter(Boolean) ?? []) as Person[]
   const currentSession = data.attendance.find((item) => item.classId === selectedId && item.date === callDate)
   const sessionFinalized = currentSession?.status !== 'rascunho' && Boolean(currentSession)
 
@@ -136,7 +136,7 @@ export function EbdPage() {
       name: String(form.get('name')).trim(),
       description: String(form.get('description')).trim() || undefined,
       teacherIds: form.getAll('teachers').map(String),
-      studentIds: form.getAll('students').map(String),
+      studentIds: editing?.studentIds ?? [],
       active: form.get('active') === 'on',
     }
     const saved = await updateData((draft) => {
@@ -158,15 +158,15 @@ export function EbdPage() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Escola Bíblica Dominical" title="Classes da Escola Dominical" description={canManage ? 'Gerencie classes, professores, alunos e frequência.' : 'Consulte seus alunos, faça a chamada e acompanhe a frequência.'} actions={canManage && <button className="button primary" onClick={() => { setEditing(null); setClassOpen(true) }}><Plus size={18} /> Nova classe</button>} />
+      <PageHeader eyebrow="Escola Bíblica Dominical" title="Classes da Escola Dominical" description={canManage ? 'Gerencie classes, professores e frequência. As matrículas são definidas em Cadastros.' : 'Consulte seus alunos, faça a chamada e acompanhe a frequência.'} actions={canManage && <button className="button primary" onClick={() => { setEditing(null); setClassOpen(true) }}><Plus size={18} /> Nova classe</button>} />
       {availableClasses.length ? <>
         <div className="class-selector" role="tablist" aria-label="Classes">{availableClasses.map((item) => <button role="tab" aria-selected={item.id === selectedId} className={item.id === selectedId ? 'active' : ''} key={item.id} onClick={() => setSelectedId(item.id)}><BookOpenCheck size={18} /><span>{item.name}</span><small>{item.studentIds.length} alunos</small></button>)}</div>
         <div className="ebd-layout">
           <section className="panel student-panel">
             <div className="panel-header student-panel-header"><div><h2>Alunos da classe</h2><p>{selectedClass?.name} · {students.length} alunos matriculados</p></div>{canTakeAttendance && students.length > 0 && <button className={sessionFinalized ? 'button secondary' : 'button primary'} onClick={openAttendance}><CalendarCheck2 size={18} /> {attendanceButtonLabel}</button>}</div>
-            {students.length ? <div className="student-directory">{students.map((student) => <div className="student-directory-row" key={student.id}><div className="member-identity"><span className="avatar small-avatar">{student.name.charAt(0)}</span><div><strong>{student.name}</strong><small>{student.status}</small></div></div><div className="student-contact"><span><Phone size={15} /> {student.phone}</span><span><Cake size={15} /> {ageFromBirthDate(student.birthDate)} anos</span></div></div>)}</div> : <EmptyState title="Classe sem alunos" description={canManage ? 'Edite a classe para matricular membros.' : 'Peça à Secretaria ou ao Conselho para cadastrar os alunos.'} />}
+            {students.length ? <div className="student-directory">{students.map((student) => <div className="student-directory-row" key={student.id}><div className="member-identity"><span className="avatar small-avatar">{student.name.charAt(0)}</span><div><strong>{student.name}</strong><small>Matrícula {student.ebd?.registrationNumber ?? 'não informada'}</small></div></div><div className="student-contact"><span><Phone size={15} /> {student.phone || 'Sem celular'}</span><span><Cake size={15} /> {student.birthDate ? `${ageFromBirthDate(student.birthDate)} anos` : 'Nascimento não informado'}</span></div></div>)}</div> : <EmptyState title="Classe sem alunos" description={canManage ? 'Vincule alunos a esta classe pela aba Cadastros.' : 'Peça à Secretaria ou ao Conselho para cadastrar os alunos.'} />}
           </section>
-          <aside className="panel report-card"><div className="panel-header"><div><h2>Relatório da classe</h2><p>Histórico de frequência</p></div></div><div className="attendance-rate"><strong>{summary.total ? Math.round((summary.present / summary.total) * 100) : 0}%</strong><span>presença geral</span></div><div className="session-list">{classSessions.slice(0, 6).map((session) => { const values = Object.values(session.records); const present = values.filter((item) => item === 'presente').length; return <div key={session.id}><span>{displayDate(session.date)}</span><strong>{present}/{values.length}</strong><StatusBadge tone={session.status === 'rascunho' ? 'neutral' : values.length && present / values.length >= .75 ? 'success' : 'warning'}>{session.status === 'rascunho' ? 'Rascunho' : `${values.length ? Math.round(present / values.length * 100) : 0}%`}</StatusBadge></div> })}{!classSessions.length && <p className="muted">Nenhuma chamada registrada.</p>}</div>{canManage && selectedClass && <button className="button secondary button-block" onClick={() => { setEditing(selectedClass); setClassOpen(true) }}>Editar classe e matrículas</button>}</aside>
+          <aside className="panel report-card"><div className="panel-header"><div><h2>Relatório da classe</h2><p>Histórico de frequência</p></div></div><div className="attendance-rate"><strong>{summary.total ? Math.round((summary.present / summary.total) * 100) : 0}%</strong><span>presença geral</span></div><div className="session-list">{classSessions.slice(0, 6).map((session) => { const values = Object.values(session.records); const present = values.filter((item) => item === 'presente').length; return <div key={session.id}><span>{displayDate(session.date)}</span><strong>{present}/{values.length}</strong><StatusBadge tone={session.status === 'rascunho' ? 'neutral' : values.length && present / values.length >= .75 ? 'success' : 'warning'}>{session.status === 'rascunho' ? 'Rascunho' : `${values.length ? Math.round(present / values.length * 100) : 0}%`}</StatusBadge></div> })}{!classSessions.length && <p className="muted">Nenhuma chamada registrada.</p>}</div>{canManage && selectedClass && <button className="button secondary button-block" onClick={() => { setEditing(selectedClass); setClassOpen(true) }}>Editar classe e professores</button>}</aside>
         </div>
       </> : <section className="panel"><EmptyState title="Nenhuma classe disponível" description="Não há classes ativas vinculadas ao seu acesso." /></section>}
 
@@ -199,13 +199,12 @@ export function EbdPage() {
         <div className="attendance-workspace-footer"><div><strong>{presentCount} presentes</strong><span>{students.length - presentCount} ausentes ou não marcados</span></div>{isReadOnly ? <button className="button primary" onClick={closeAttendance}>Fechar</button> : <div><button className="button secondary" disabled={saving} onClick={() => saveAttendance('rascunho')}><Save size={18} /> {saving ? 'Salvando...' : 'Salvar rascunho'}</button><button className="button primary" disabled={saving} onClick={() => { if (markedCount < students.length) void saveAttendance('finalizada'); else setConfirmFinalize(true) }}><CheckCircle2 size={18} /> Finalizar chamada</button></div>}</div>
       </Modal>
 
-      <Modal title={editing ? 'Editar classe' : 'Nova classe'} description="Somente Conselho, Administrador e responsáveis autorizados podem alterar matrículas." open={classOpen} onClose={() => setClassOpen(false)} wide>
+      <Modal title={editing ? 'Editar classe' : 'Nova classe'} description="As matrículas dos alunos são definidas individualmente na aba Cadastros." open={classOpen} onClose={() => setClassOpen(false)} wide>
         <form key={editing?.id ?? 'new'} onSubmit={saveClass}>
           <div className="form-grid two-columns"><Field label="Nome da classe *"><input name="name" required defaultValue={editing?.name} /></Field><Field label="Descrição"><input name="description" defaultValue={editing?.description} /></Field></div>
           <label className="check-row inline-check"><input name="active" type="checkbox" defaultChecked={editing?.active ?? true} /><span><strong>Classe ativa</strong></span></label>
-          <div className="assignment-grid">
+          <div className="assignment-grid single">
             <fieldset><legend>Professores</legend><div className="selection-list">{accountUsers.filter((user) => user.status === 'ativo' && (user.roles.includes('professor') || user.roles.includes('administrador') || user.roles.includes('conselho'))).map((user) => <label key={user.id}><input type="checkbox" name="teachers" value={user.id} defaultChecked={editing?.teacherIds.includes(user.id)} /><span>{user.name}<small>{user.email}</small></span></label>)}</div></fieldset>
-            <fieldset><legend>Alunos</legend><div className="selection-list">{data.members.filter((member) => member.status !== 'Excluído' && member.status !== 'Falecido').map((member) => <label key={member.id}><input type="checkbox" name="students" value={member.id} defaultChecked={editing?.studentIds.includes(member.id)} /><span>{member.name}<small>{member.status}</small></span></label>)}</div></fieldset>
           </div>
           <FormActions onCancel={() => setClassOpen(false)} />
         </form>

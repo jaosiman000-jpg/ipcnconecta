@@ -45,30 +45,22 @@ describe('contrato das mutações seguras', () => {
     expect(invalidId.success).toBe(false)
   })
 
-  it('recusa metadados de arquivo acima de 10 MB', () => {
-    const parsed = mutationSchema.safeParse({
-      type: 'finance.create',
-      entry: {
-        id: 'finance-1',
-        type: 'entrada',
+  it('aceita lote de contribuições e recusa dízimo anônimo', () => {
+    const valid = mutationSchema.safeParse({
+      type: 'finance.batch.save',
+      batch: {
+        id: 'batch-1',
         date: '2026-10-25',
-        amount: 100,
-        category: 'Dízimos',
-        description: 'Registro de teste',
-        account: 'Caixa',
-        createdBy: 'user-1',
-        receipt: {
-          id: 'receipt-1',
-          name: 'comprovante.pdf',
-          type: 'application/pdf',
-          size: 10 * 1024 * 1024 + 1,
-          addedAt: '2026-10-25T12:00:00.000Z',
-          storagePath: 'finance/finance-1/receipt-1.pdf',
-        },
+        items: [{ id: 'item-1', amount: 100, category: 'Dízimo', method: 'PIX', personId: 'person-1', contributorName: 'Pessoa Teste', anonymous: false }],
       },
     })
+    const anonymousTithe = mutationSchema.safeParse({
+      type: 'finance.batch.save',
+      batch: { id: 'batch-2', date: '2026-10-25', items: [{ id: 'item-1', amount: 100, category: 'Dízimo', method: 'Dinheiro', contributorName: 'Anônimo', anonymous: true }] },
+    })
 
-    expect(parsed.success).toBe(false)
+    expect(valid.success).toBe(true)
+    expect(anonymousTithe.success).toBe(false)
   })
 
   it('aceita rascunho de chamada com visitante e recusa campos extras', () => {
@@ -100,5 +92,41 @@ describe('contrato das mutações seguras', () => {
 
     expect(valid.success).toBe(true)
     expect(accessInjection.success).toBe(false)
+  })
+
+  it('aceita cadastro unificado sem números definidos pelo navegador', () => {
+    const parsed = mutationSchema.safeParse({
+      type: 'person.save',
+      person: {
+        id: 'person-1',
+        name: 'Pessoa Teste',
+        birthDate: '2000-01-01',
+        phone: '31999999999',
+        sex: 'Feminino',
+        ebd: { classId: 'class-1', professor: false, status: 'ativo' },
+        membership: { type: 'Comungante', status: 'Ativo' },
+        tither: true,
+        status: 'ativo',
+        source: 'manual',
+      },
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
+  it('recusa vínculo, sexo e situação fora dos valores permitidos', () => {
+    const parsed = mutationSchema.safeParse({
+      type: 'person.save',
+      person: {
+        id: 'person-1',
+        name: 'Pessoa Teste',
+        sex: 'Outro valor',
+        membership: { type: 'Visitante', status: 'Ativo' },
+        tither: false,
+        status: 'ativo',
+      },
+    })
+
+    expect(parsed.success).toBe(false)
   })
 })

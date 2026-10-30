@@ -16,7 +16,7 @@ import { hasCapability, isSuperuser } from './permissions'
 import { callSecureMutation, type SecureMutation } from './secureApi'
 import type { AppData, AuditEntry, Member, User } from './types'
 
-type DataKey = 'visitors' | 'classes' | 'attendance' | 'societies' | 'societyRequests' | 'finance'
+type DataKey = 'visitors' | 'classes' | 'attendance' | 'societies' | 'societyRequests' | 'people' | 'financeBatches' | 'finance'
 
 const collectionNames: Record<DataKey, string> = {
   visitors: 'visitors',
@@ -24,6 +24,8 @@ const collectionNames: Record<DataKey, string> = {
   attendance: 'attendance',
   societies: 'societies',
   societyRequests: 'societyRequests',
+  people: 'people',
+  financeBatches: 'financeBatches',
   finance: 'financeEntries',
 }
 
@@ -43,6 +45,13 @@ function idQueries(name: string, ids: string[]): Query<DocumentData>[] {
   const groups: string[][] = []
   for (let index = 0; index < unique.length; index += 30) groups.push(unique.slice(index, index + 30))
   return groups.map((group) => query(collection(firestore!, name), where(documentId(), 'in', group)))
+}
+
+function fieldQueries(name: string, field: string, values: string[]): Query<DocumentData>[] {
+  const unique = [...new Set(values)]
+  const groups: string[][] = []
+  for (let index = 0; index < unique.length; index += 30) groups.push(unique.slice(index, index + 30))
+  return groups.map((group) => query(collection(firestore!, name), where(field, 'in', group)))
 }
 
 function subscribeQueries<T>(queries: Query<DocumentData>[], receive: (items: T[]) => void): Unsubscribe {
@@ -81,7 +90,7 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
   const emitMembers = () => receive({ members: publicMembers.map((member) => ({ ...basicMember(member), ...privateMembers.get(member.id) })) })
 
   const canReadFullMembers = hasCapability(user, 'members.view')
-  const needsMemberDirectory = hasCapability(user, 'ebd.view') || hasCapability(user, 'societies.view')
+  const needsMemberDirectory = hasCapability(user, 'societies.view')
   if (canReadFullMembers) {
     stops.push(subscribeQueries<Member>([fullCollection('members')], (items) => { publicMembers = items; emitMembers() }))
     if (isSuperuser(user)) {
@@ -94,12 +103,31 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
     stops.push(subscribeQueries<Member>([fullCollection('memberDirectory')], (items) => { publicMembers = items; emitMembers() }))
   } else receive({ members: [] })
 
+  if (hasCapability(user, 'people.view')) {
+    stops.push(subscribeQueries([fullCollection('people')], (items: AppData['people']) => receive({ people: items })))
+  } else if (hasCapability(user, 'ebd.view') || hasCapability(user, 'finance.view')) {
+    let ebdPeople: AppData['people'] = []
+    let financePeople: AppData['people'] = []
+    const emitPeople = () => {
+      const merged = new Map<string, AppData['people'][number]>()
+      ;[...ebdPeople, ...financePeople].forEach((person) => merged.set(person.id, { ...merged.get(person.id), ...person }))
+      receive({ people: [...merged.values()] })
+    }
+    if (hasCapability(user, 'ebd.view')) {
+      stops.push(subscribeQueries(fieldQueries('ebdDirectory', 'ebd.classId', user.classIds), (items: AppData['people']) => { ebdPeople = items; emitPeople() }))
+    }
+    if (hasCapability(user, 'finance.view')) {
+      stops.push(subscribeQueries([fullCollection('financeDirectory')], (items: AppData['people']) => { financePeople = items; emitPeople() }))
+    }
+  } else receive({ people: [] })
+
   const subscriptions: [boolean, DataKey, Query<DocumentData>[]][] = [
     [hasCapability(user, 'visitors.view'), 'visitors', [fullCollection('visitors')]],
     [hasCapability(user, 'ebd.manage'), 'classes', [fullCollection('ebdClasses')]],
     [hasCapability(user, 'ebd.manage'), 'attendance', [fullCollection('attendance')]],
     [hasCapability(user, 'societies.manage'), 'societies', [fullCollection('societies')]],
     [hasCapability(user, 'societies.manage'), 'societyRequests', [fullCollection('societyRequests')]],
+    [hasCapability(user, 'finance.view'), 'financeBatches', [fullCollection('financeBatches')]],
     [hasCapability(user, 'finance.view'), 'finance', [fullCollection('financeEntries')]],
   ]
 
@@ -149,14 +177,12 @@ function changed<T extends { id: string }>(before: T[], after: T[]) {
 }
 
 function mutationForChange(before: AppData, after: AppData, action?: string): SecureMutation | undefined {
-  const memberChanges = changed(before.members, after.members)
   const visitorChanges = changed(before.visitors, after.visitors)
   const classChanges = changed(before.classes, after.classes)
   const attendanceChanges = changed(before.attendance, after.attendance)
   const societyChanges = changed(before.societies, after.societies)
   const requestChanges = changed(before.societyRequests, after.societyRequests)
-  const financeChanges = changed(before.finance, after.finance)
-  const removed = [memberChanges, visitorChanges, classChanges, attendanceChanges, societyChanges, requestChanges, financeChanges]
+  const removed = [visitorChanges, classChanges, attendanceChanges, societyChanges, requestChanges]
     .some((change) => change.removed.length > 0)
   if (removed) throw new Error('Exclusões ainda não estão disponíveis neste fluxo seguro.')
 
@@ -169,7 +195,6 @@ function mutationForChange(before: AppData, after: AppData, action?: string): Se
   }
 
   const candidates: SecureMutation[] = []
-  if (memberChanges.upserts.length === 1) candidates.push({ type: 'member.save', member: memberChanges.upserts[0] })
   if (visitorChanges.upserts.length === 1) {
     const visitor = visitorChanges.upserts[0]
     candidates.push(action === 'visitante.contatado'
@@ -188,7 +213,6 @@ function mutationForChange(before: AppData, after: AppData, action?: string): Se
       candidates.push({ type: 'society.request.create', id: item.id, societyId: item.societyId, memberId: item.memberId })
     }
   }
-  if (financeChanges.upserts.length === 1) candidates.push({ type: 'finance.create', entry: financeChanges.upserts[0] })
   if (JSON.stringify(before.settings) !== JSON.stringify(after.settings)) {
     candidates.push({ type: 'settings.update', whatsappMessage: after.settings.whatsappMessage })
   }

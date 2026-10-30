@@ -5,6 +5,8 @@ export type Capability =
   | 'members.view'
   | 'members.manage'
   | 'members.restricted'
+  | 'people.view'
+  | 'people.manage'
   | 'visitors.view'
   | 'visitors.manage'
   | 'ebd.view'
@@ -26,6 +28,8 @@ const allCapabilities: Capability[] = [
   'members.view',
   'members.manage',
   'members.restricted',
+  'people.view',
+  'people.manage',
   'visitors.view',
   'visitors.manage',
   'ebd.view',
@@ -47,7 +51,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   administrador: 'Administrador',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
-  tesouraria: 'Tesouraria',
+  diacono: 'Junta Diaconal',
   professor: 'Professor',
   lider: 'Líder de sociedade',
   acolhimento: 'Acolhimento',
@@ -61,10 +65,10 @@ const roleCapabilities: Record<Role, Capability[]> = {
   administrador: allCapabilities,
   conselho: allCapabilities,
   secretaria: [
-    'dashboard.view', 'members.view', 'members.manage', 'visitors.view', 'visitors.manage',
+    'dashboard.view', 'people.view', 'people.manage', 'members.view', 'members.manage', 'visitors.view', 'visitors.manage',
     'ebd.view', 'ebd.manage', 'societies.view', 'reports.view', 'settings.view',
   ],
-  tesouraria: ['dashboard.view', 'finance.view', 'finance.manage', 'reports.view', 'settings.view'],
+  diacono: ['dashboard.view', 'finance.view', 'finance.manage', 'reports.view', 'settings.view'],
   professor: ['dashboard.view', 'ebd.view', 'ebd.attendance', 'settings.view'],
   lider: ['dashboard.view', 'societies.view', 'societies.request', 'settings.view'],
   acolhimento: ['dashboard.view', 'visitors.view', 'visitors.manage', 'settings.view'],

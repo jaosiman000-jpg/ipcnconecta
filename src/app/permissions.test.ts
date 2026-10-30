@@ -21,12 +21,24 @@ describe('permissões cumulativas', () => {
   })
 
   it('permite que todos consultem o próprio perfil sem liberar configurações administrativas', () => {
-    const roles: User['roles'] = ['administrador', 'conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']
+    const roles: User['roles'] = ['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
 
     roles.forEach((role) => expect(hasCapability(user([role]), 'settings.view')).toBe(true))
     roles.slice(2).forEach((role) => expect(hasCapability(user([role]), 'settings.manage')).toBe(false))
     expect(hasCapability(user(['administrador']), 'settings.manage')).toBe(true)
     expect(hasCapability(user(['conselho']), 'settings.manage')).toBe(true)
+  })
+
+  it('libera o financeiro para a Junta Diaconal sem liberar usuários', () => {
+    expect(hasCapability(user(['diacono']), 'finance.manage')).toBe(true)
+    expect(hasCapability(user(['diacono']), 'people.view')).toBe(false)
+    expect(hasCapability(user(['diacono']), 'users.manage')).toBe(false)
+  })
+
+  it('libera o cadastro unificado somente para Secretaria e superusuários', () => {
+    expect(hasCapability(user(['secretaria']), 'people.manage')).toBe(true)
+    expect(hasCapability(user(['professor']), 'people.view')).toBe(false)
+    expect(hasCapability(user(['diacono']), 'people.view')).toBe(false)
   })
 
   it('não autoriza usuário desativado', () => {

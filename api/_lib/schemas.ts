@@ -2,38 +2,60 @@ import { z } from 'zod'
 
 const id = z.string().min(1).max(160).regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)
 const shortText = z.string().trim().max(300)
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), 'Data inválida')
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}, 'Data inválida')
 const optionalText = (max: number) => z.string().trim().max(max).optional()
 const ids = z.array(id).max(500).refine((items) => new Set(items).size === items.length, 'IDs duplicados')
 
-const storedFile = z.object({
-  id,
-  name: z.string().trim().min(1).max(255),
-  type: z.enum([
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-  ]),
-  size: z.number().int().positive().max(10 * 1024 * 1024),
-  addedAt: z.string().datetime(),
-  storagePath: z.string().min(1).max(500),
+const personAddress = z.object({
+  street: optionalText(160),
+  numberComplement: optionalText(80),
+  neighborhood: optionalText(100),
+  city: optionalText(100),
+  postalCode: optionalText(20),
 }).strict()
 
-const member = z.object({
+const personEbd = z.object({
+  registrationNumber: z.number().int().positive().max(999_999).optional(),
+  classId: id.optional(),
+  className: optionalText(120),
+  enrolledAt: isoDate.optional(),
+  professor: z.boolean(),
+  status: z.enum(['ativo', 'inativo']),
+}).strict()
+
+const personMembership = z.object({
+  memberNumber: z.number().int().positive().max(999_999).optional(),
+  type: z.enum(['Comungante', 'Não comungante']),
+  status: z.enum(['Ativo', 'Em análise', 'Disciplinado', 'Excluído', 'Falecido']),
+  joinedAt: isoDate.optional(),
+}).strict()
+
+const person = z.object({
   id,
   name: z.string().trim().min(3).max(120),
-  birthDate: isoDate,
-  phone: z.string().trim().min(5).max(30),
-  address: optionalText(300),
-  cpf: optionalText(20),
+  birthDate: isoDate.optional(),
+  phone: optionalText(30),
+  homePhone: optionalText(30),
   email: z.string().trim().email().max(254).optional(),
-  status: z.enum(['Ativo', 'Em análise', 'Disciplinado', 'Excluído', 'Falecido']),
-  restrictedNotes: optionalText(5000),
-  documents: z.array(storedFile).max(20),
-  createdAt: z.string().datetime(),
+  sex: z.enum(['Feminino', 'Masculino']).optional(),
+  address: personAddress.optional(),
+  nationality: optionalText(80),
+  birthCity: optionalText(100),
+  birthState: optionalText(30),
+  maritalStatus: z.enum(['Solteiro', 'Casado', 'Divorciado', 'Viúvo']).optional(),
+  fatherName: optionalText(120),
+  fatherIsMember: z.boolean().optional(),
+  motherName: optionalText(120),
+  motherIsMember: z.boolean().optional(),
+  ebd: personEbd.optional(),
+  membership: personMembership.optional(),
+  tither: z.boolean(),
+  status: z.enum(['ativo', 'arquivado', 'falecido']),
+  source: z.enum(['manual', 'ipcn-ebd-import']).optional(),
 }).strict()
 
 const visitor = z.object({
@@ -82,21 +104,30 @@ const society = z.object({
   officers: z.array(societyOfficer).max(6),
 }).strict().refine((value) => value.maxAge === undefined || value.maxAge >= value.minAge, 'Faixa etária inválida')
 
-const financeEntry = z.object({
+const contributionItem = z.object({
   id,
-  type: z.enum(['entrada', 'saída']),
-  date: isoDate,
   amount: z.number().positive().max(1_000_000_000),
-  category: z.string().trim().min(1).max(80),
-  description: z.string().trim().min(1).max(300),
-  account: z.string().trim().min(1).max(120),
-  contributor: optionalText(120),
-  receiptName: optionalText(255),
-  receipt: storedFile.optional(),
-  createdBy: z.string().max(160),
+  category: z.enum(['Dízimo', 'Oferta', 'Missões']),
+  method: z.enum(['Dinheiro', 'PIX']),
+  personId: id.optional(),
+  contributorName: z.string().trim().min(1).max(120),
+  anonymous: z.boolean(),
+}).strict().superRefine((item, context) => {
+  if (item.category === 'Dízimo' && (item.anonymous || !item.personId)) {
+    context.addIssue({ code: 'custom', message: 'O dízimo precisa estar vinculado a uma pessoa.' })
+  }
+  if (item.anonymous && item.personId) {
+    context.addIssue({ code: 'custom', message: 'Uma contribuição anônima não pode ter pessoa vinculada.' })
+  }
+})
+
+const contributionBatch = z.object({
+  id,
+  date: isoDate,
+  items: z.array(contributionItem).max(200).refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'Itens duplicados'),
 }).strict()
 
-const roles = z.array(z.enum(['administrador', 'conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento']))
+const roles = z.array(z.enum(['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']))
   .min(1).max(7).refine((items) => new Set(items).size === items.length, 'Papéis duplicados')
 
 const profilePhoto = z.string()
@@ -104,7 +135,14 @@ const profilePhoto = z.string()
   .regex(/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/)
 
 export const mutationSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('member.save'), member }).strict(),
+  z.object({ type: z.literal('person.save'), person }).strict(),
+  z.object({
+    type: z.literal('people.import'),
+    importId: id,
+    people: z.array(person).min(1).max(250)
+      .refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'Pessoas duplicadas')
+      .refine((items) => items.every((item) => item.source === 'ipcn-ebd-import' && item.ebd?.registrationNumber), 'Importação sem matrícula'),
+  }).strict(),
   z.object({ type: z.literal('visitor.save'), visitor }).strict(),
   z.object({ type: z.literal('visitor.contact'), visitorId: id }).strict(),
   z.object({ type: z.literal('ebd.class.save'), item: ebdClass }).strict(),
@@ -112,7 +150,10 @@ export const mutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('society.save'), item: society }).strict(),
   z.object({ type: z.literal('society.request.create'), id, societyId: id, memberId: id }).strict(),
   z.object({ type: z.literal('society.request.review'), requestId: id, approved: z.boolean() }).strict(),
-  z.object({ type: z.literal('finance.create'), entry: financeEntry }).strict(),
+  z.object({ type: z.literal('finance.batch.save'), batch: contributionBatch }).strict(),
+  z.object({ type: z.literal('finance.batch.finalize'), batchId: id }).strict(),
+  z.object({ type: z.literal('finance.batch.discard'), batchId: id }).strict(),
+  z.object({ type: z.literal('finance.entry.cancel'), entryId: id, reason: z.string().trim().min(5).max(500) }).strict(),
   z.object({ type: z.literal('settings.update'), whatsappMessage: z.string().trim().min(1).max(1000) }).strict(),
   z.object({ type: z.literal('user.profile.update'), name: z.string().trim().min(3).max(120), photo: profilePhoto.optional() }).strict(),
   z.object({ type: z.literal('user.access.save'), userId: id, roles, classIds: ids, societyIds: ids }).strict(),

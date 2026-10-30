@@ -21,7 +21,7 @@ export interface Actor {
   societyIds: string[]
 }
 
-const validRoles = new Set<Role>(['administrador', 'conselho', 'secretaria', 'tesouraria', 'professor', 'lider', 'acolhimento'])
+const validRoles = new Set<Role>(['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento'])
 
 export function json(data: unknown, status = 200) {
   return Response.json(data, {

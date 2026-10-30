@@ -6,8 +6,10 @@ import { AuditPage } from './pages/AuditPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { EbdPage } from './pages/EbdPage'
 import { FinancePage } from './pages/FinancePage'
+import { ContributionWorkspacePage } from './pages/ContributionWorkspacePage'
 import { LoginPage } from './pages/LoginPage'
 import { MembersPage } from './pages/MembersPage'
+import { PeoplePage } from './pages/PeoplePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SocietiesPage } from './pages/SocietiesPage'
@@ -32,10 +34,12 @@ export function App() {
       <Route element={<ProtectedApp />}>
         <Route index element={<DashboardPage />} />
         <Route path="membros" element={<Guard capability="members.view"><MembersPage /></Guard>} />
+        <Route path="cadastros" element={<Guard capability="people.view"><PeoplePage /></Guard>} />
         <Route path="visitantes" element={<Guard capability="visitors.view"><VisitorsPage /></Guard>} />
         <Route path="ebd" element={<Guard capability="ebd.view"><EbdPage /></Guard>} />
         <Route path="sociedades" element={<Guard capability="societies.view"><SocietiesPage /></Guard>} />
         <Route path="financeiro" element={<Guard capability="finance.view"><FinancePage /></Guard>} />
+        <Route path="financeiro/contribuicoes/novo" element={<Guard capability="finance.manage"><ContributionWorkspacePage /></Guard>} />
         <Route path="relatorios" element={<Guard capability="reports.view"><ReportsPage /></Guard>} />
         <Route path="usuarios" element={<Guard capability="users.manage"><UsersPage /></Guard>} />
         <Route path="auditoria" element={<Guard capability="audit.view"><AuditPage /></Guard>} />

@@ -366,13 +366,14 @@ async function saveAttendance(db: Firestore, actor: Actor, input: Extract<Mutati
 
   const existing = await db.collection('attendance').where('classId', '==', input.classId).where('date', '==', input.date).limit(1).get()
   const existingDocument = existing.docs[0]
-  if (existingDocument && existingDocument.data().status !== 'rascunho' && !manager) {
-    throw new ApiError(409, 'attendance_finalized', 'Esta chamada já foi finalizada.')
-  }
+  const existingData = existingDocument?.data()
+  const editingFinalized = Boolean(existingDocument && existingData?.status !== 'rascunho')
+  if (editingFinalized && input.status !== 'finalizada') throw new ApiError(409, 'attendance_reopen_denied', 'Uma chamada finalizada só pode ser salva como finalizada.')
   const ref = existingDocument?.ref ?? db.collection('attendance').doc(`${input.classId}_${input.date}`)
+  const now = Timestamp.now()
   const batch = db.batch()
-  batch.set(ref, clean({ id: ref.id, classId: input.classId, date: input.date, records: input.records, visitors: input.visitors, status: input.status, createdBy: actor.id, updatedAt: Timestamp.now() }))
-  const result = { action: input.status === 'finalizada' ? 'ebd.chamada_finalizada' : 'ebd.chamada_rascunho', detail: `${String(classData.name ?? 'Classe')} em ${input.date}`, targetId: ref.id }
+  batch.set(ref, clean({ id: ref.id, classId: input.classId, date: input.date, records: input.records, visitors: input.visitors, status: input.status, createdBy: existingData?.createdBy ?? actor.id, createdAt: existingData?.createdAt ?? now, updatedBy: actor.id, updatedAt: now }))
+  const result = { action: editingFinalized ? 'ebd.chamada_editada' : input.status === 'finalizada' ? 'ebd.chamada_finalizada' : 'ebd.chamada_rascunho', detail: `${String(classData.name ?? 'Classe')} em ${input.date}`, targetId: ref.id }
   addAudit(batch, db, actor, result)
   await batch.commit()
   return result

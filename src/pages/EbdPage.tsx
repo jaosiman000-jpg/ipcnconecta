@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { BookOpenCheck, CalendarCheck2, Cake, CheckCircle2, Phone, Plus, Save, Trash2, UserRoundPlus, Users } from 'lucide-react'
+import { BookOpenCheck, CalendarCheck2, Cake, CheckCircle2, Pencil, Phone, Plus, Save, Trash2, UserRoundPlus, Users } from 'lucide-react'
 import { makeId, useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
 import { ageFromBirthDate, displayDate, localIsoDate } from '../app/format'
@@ -30,6 +30,7 @@ export function EbdPage() {
   const [saveFeedback, setSaveFeedback] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmFinalize, setConfirmFinalize] = useState(false)
+  const [editingFinalized, setEditingFinalized] = useState(false)
   const [classOpen, setClassOpen] = useState(false)
   const [editing, setEditing] = useState<EbdClass | null>(null)
   const prompted = useRef(new Set<string>())
@@ -37,7 +38,8 @@ export function EbdPage() {
   const canManage = hasCapability(currentUser, 'ebd.manage')
   const canTakeAttendance = hasCapability(currentUser, 'ebd.attendance')
   const selectedClass = availableClasses.find((item) => item.id === selectedId)
-  const students = (selectedClass?.studentIds.map((id) => data.people.find((person) => person.id === id)).filter(Boolean) ?? []) as Person[]
+  const students = ((selectedClass?.studentIds.map((id) => data.people.find((person) => person.id === id)).filter(Boolean) ?? []) as Person[])
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
   const currentSession = data.attendance.find((item) => item.classId === selectedId && item.date === callDate)
   const sessionFinalized = currentSession?.status !== 'rascunho' && Boolean(currentSession)
 
@@ -61,7 +63,7 @@ export function EbdPage() {
 
   const markedCount = students.filter((student) => Boolean(records[student.id])).length
   const presentCount = students.filter((student) => records[student.id] === 'presente').length
-  const isReadOnly = sessionFinalized
+  const isReadOnly = sessionFinalized && !editingFinalized
 
   function openAttendance() {
     setRecords(currentSession?.records ?? {})
@@ -69,6 +71,7 @@ export function EbdPage() {
     setAttendanceError('')
     setSaveFeedback('')
     setConfirmFinalize(false)
+    setEditingFinalized(false)
     setVisitorFormOpen(false)
     setPromptOpen(false)
     setAttendanceOpen(true)
@@ -78,6 +81,15 @@ export function EbdPage() {
     if (saving) return
     setAttendanceOpen(false)
     setConfirmFinalize(false)
+    setEditingFinalized(false)
+  }
+
+  function cancelFinalizedEditing() {
+    setRecords(currentSession?.records ?? {})
+    setAttendanceVisitors(currentSession?.visitors ?? [])
+    setVisitorFormOpen(false)
+    setAttendanceError('')
+    setEditingFinalized(false)
   }
 
   function addAttendanceVisitor(event: FormEvent<HTMLFormElement>) {
@@ -106,13 +118,13 @@ export function EbdPage() {
     setSaving(true)
     setAttendanceError('')
     setSaveFeedback('')
+    const wasEditingFinalized = sessionFinalized
     const saved = await updateData((draft) => {
       const existing = draft.attendance.find((item) => item.classId === selectedClass.id && item.date === callDate)
       if (existing) {
         existing.records = records
         existing.visitors = attendanceVisitors
         existing.status = status
-        existing.createdBy = currentUser.id
       } else {
         draft.attendance.unshift({ id: makeId('attendance'), classId: selectedClass.id, date: callDate, records, visitors: attendanceVisitors, status, createdBy: currentUser.id })
       }
@@ -125,7 +137,8 @@ export function EbdPage() {
     }
     setAttendanceOpen(false)
     setConfirmFinalize(false)
-    window.alert('Chamada finalizada e sincronizada.')
+    setEditingFinalized(false)
+    window.alert(wasEditingFinalized ? 'Correção salva e sincronizada.' : 'Chamada finalizada e sincronizada.')
   }
 
   async function saveClass(event: FormEvent<HTMLFormElement>) {
@@ -173,14 +186,14 @@ export function EbdPage() {
       <Modal title="Fazer chamada" description={`${selectedClass?.name ?? 'Classe'} · ${displayDate(callDate)}`} open={promptOpen} onClose={() => setPromptOpen(false)} className="attendance-prompt-modal">
         <div className="attendance-prompt-body">
           <span className="attendance-prompt-icon"><CalendarCheck2 size={28} /></span>
-          <div><h3>{sessionFinalized ? 'A chamada de hoje já foi finalizada' : currentSession ? 'Há uma chamada em andamento' : 'A chamada da classe está disponível'}</h3><p>{sessionFinalized ? 'Você pode consultar os registros e visitantes desta aula.' : currentSession ? 'Continue de onde parou para concluir o registro.' : 'Marque os presentes, ausentes e visitantes da classe.'}</p></div>
+          <div><h3>{sessionFinalized ? 'A chamada de hoje já foi finalizada' : currentSession ? 'Há uma chamada em andamento' : 'A chamada da classe está disponível'}</h3><p>{sessionFinalized ? 'Você pode consultar ou corrigir os registros e visitantes desta aula.' : currentSession ? 'Continue de onde parou para concluir o registro.' : 'Marque os presentes, ausentes e visitantes da classe.'}</p></div>
         </div>
         <div className="attendance-prompt-actions"><button className="button secondary" onClick={() => setPromptOpen(false)}>Agora não</button><button className="button primary" onClick={openAttendance}><CalendarCheck2 size={18} /> {attendanceButtonLabel}</button></div>
       </Modal>
 
       <Modal title={`Chamada — ${selectedClass?.name ?? 'Classe'}`} description={`${displayDate(callDate)} · ${students.length} alunos matriculados`} open={attendanceOpen} onClose={closeAttendance} wide className="attendance-workspace-modal">
         <div className="attendance-workspace">
-          <div className="attendance-progress"><div><strong>{markedCount} de {students.length} alunos marcados</strong><span>{presentCount} presentes · {attendanceVisitors.length} {attendanceVisitors.length === 1 ? 'visitante' : 'visitantes'}</span></div><div className="attendance-progress-track" aria-label={`${markedCount} de ${students.length} alunos marcados`}><span style={{ transform: `scaleX(${students.length ? markedCount / students.length : 0})` }} /></div>{isReadOnly && <StatusBadge tone="success">Finalizada</StatusBadge>}</div>
+          <div className="attendance-progress"><div><strong>{markedCount} de {students.length} alunos marcados</strong><span>{presentCount} presentes · {attendanceVisitors.length} {attendanceVisitors.length === 1 ? 'visitante' : 'visitantes'}</span></div><div className="attendance-progress-track" aria-label={`${markedCount} de ${students.length} alunos marcados`}><span style={{ transform: `scaleX(${students.length ? markedCount / students.length : 0})` }} /></div>{isReadOnly ? <StatusBadge tone="success">Finalizada</StatusBadge> : editingFinalized ? <StatusBadge tone="warning">Corrigindo</StatusBadge> : null}</div>
 
           <div className="attendance-workspace-list">
             {students.map((student) => <div className="attendance-row" key={student.id}><div className="member-identity"><span className="avatar small-avatar">{student.name.charAt(0)}</span><div><strong>{student.name}</strong><small>{records[student.id] ? attendanceOptions.find((option) => option.value === records[student.id])?.label : 'Não marcado'}</small></div></div><div className="segmented-control" aria-label={`Presença de ${student.name}`}>{attendanceOptions.map((option) => <button type="button" disabled={isReadOnly || saving} aria-pressed={records[student.id] === option.value} className={records[student.id] === option.value ? `selected ${option.value}` : ''} key={option.value} onClick={() => { setRecords((current) => ({ ...current, [student.id]: option.value })); setAttendanceError(''); setSaveFeedback('') }}>{option.label}</button>)}</div></div>)}
@@ -194,9 +207,9 @@ export function EbdPage() {
 
           {attendanceError && <p className="attendance-message error" role="alert">{attendanceError}</p>}
           {saveFeedback && <p className="attendance-message success"><CheckCircle2 size={17} /> {saveFeedback}</p>}
-          {confirmFinalize && !isReadOnly && <div className="attendance-finalize-confirm"><div><strong>Finalizar esta chamada?</strong><p>Depois de finalizada, o professor não poderá alterar os registros.</p></div><div><button className="button secondary small" onClick={() => setConfirmFinalize(false)}>Voltar</button><button className="button primary small" disabled={saving} onClick={() => saveAttendance('finalizada')}>Confirmar finalização</button></div></div>}
+          {confirmFinalize && !isReadOnly && <div className="attendance-finalize-confirm"><div><strong>Finalizar esta chamada?</strong><p>A chamada ficará publicada. Se necessário, ela poderá ser corrigida depois.</p></div><div><button className="button secondary small" onClick={() => setConfirmFinalize(false)}>Voltar</button><button className="button primary small" disabled={saving} onClick={() => saveAttendance('finalizada')}>Confirmar finalização</button></div></div>}
         </div>
-        <div className="attendance-workspace-footer"><div><strong>{presentCount} presentes</strong><span>{students.length - presentCount} ausentes ou não marcados</span></div>{isReadOnly ? <button className="button primary" onClick={closeAttendance}>Fechar</button> : <div><button className="button secondary" disabled={saving} onClick={() => saveAttendance('rascunho')}><Save size={18} /> {saving ? 'Salvando...' : 'Salvar rascunho'}</button><button className="button primary" disabled={saving} onClick={() => { if (markedCount < students.length) void saveAttendance('finalizada'); else setConfirmFinalize(true) }}><CheckCircle2 size={18} /> Finalizar chamada</button></div>}</div>
+        <div className="attendance-workspace-footer"><div><strong>{presentCount} presentes</strong><span>{students.length - presentCount} ausentes ou não marcados</span></div>{isReadOnly ? <div><button className="button secondary" onClick={closeAttendance}>Fechar</button><button className="button primary" onClick={() => setEditingFinalized(true)}><Pencil size={18} /> Editar chamada</button></div> : editingFinalized ? <div><button className="button secondary" disabled={saving} onClick={cancelFinalizedEditing}>Cancelar edição</button><button className="button primary" disabled={saving} onClick={() => saveAttendance('finalizada')}><Save size={18} /> {saving ? 'Salvando...' : 'Salvar correções'}</button></div> : <div><button className="button secondary" disabled={saving} onClick={() => saveAttendance('rascunho')}><Save size={18} /> {saving ? 'Salvando...' : 'Salvar rascunho'}</button><button className="button primary" disabled={saving} onClick={() => { if (markedCount < students.length) void saveAttendance('finalizada'); else setConfirmFinalize(true) }}><CheckCircle2 size={18} /> Finalizar chamada</button></div>}</div>
       </Modal>
 
       <Modal title={editing ? 'Editar classe' : 'Nova classe'} description="As matrículas dos alunos são definidas individualmente na aba Cadastros." open={classOpen} onClose={() => setClassOpen(false)} wide>

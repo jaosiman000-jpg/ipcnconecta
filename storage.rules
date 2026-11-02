@@ -24,15 +24,15 @@ service firebase.storage {
     }
 
     match /members/{memberId}/{fileName} {
-      allow read: if hasRole(['administrador', 'conselho']);
-      allow create, update: if hasRole(['administrador', 'conselho']) && validUpload();
-      allow delete: if hasRole(['administrador', 'conselho']);
+      allow read: if hasRole(['administrador', 'conselho', 'secretaria']);
+      allow create, update: if hasRole(['administrador', 'conselho', 'secretaria']) && validUpload();
+      allow delete: if hasRole(['administrador', 'conselho', 'secretaria']);
     }
 
     match /finance/{entryId}/{fileName} {
-      allow read: if hasRole(['administrador', 'conselho', 'diacono']);
-      allow create, update: if hasRole(['administrador', 'conselho', 'diacono']) && validUpload();
-      allow delete: if hasRole(['administrador', 'conselho', 'diacono']);
+      allow read: if hasRole(['administrador', 'conselho', 'secretaria', 'diacono']);
+      allow create, update: if hasRole(['administrador', 'conselho', 'secretaria', 'diacono']) && validUpload();
+      allow delete: if hasRole(['administrador', 'conselho', 'secretaria', 'diacono']);
     }
 
     match /{allPaths=**} {

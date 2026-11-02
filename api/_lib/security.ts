@@ -117,8 +117,11 @@ export function requireRole(actor: Actor, roles: Role[]) {
   if (!hasAnyRole(actor, roles)) throw new ApiError(403, 'permission_denied', 'Você não tem permissão para realizar esta ação.')
 }
 
+/** Conselho e Secretaria têm acesso completo; `administrador` é um papel antigo mantido até a migração. */
+export const FULL_ACCESS_ROLES: Role[] = ['administrador', 'conselho', 'secretaria']
+
 export function isSuperuser(actor: Actor) {
-  return hasAnyRole(actor, ['administrador', 'conselho'])
+  return hasAnyRole(actor, FULL_ACCESS_ROLES)
 }
 
 /** Código técnico do erro (ex.: `auth/insufficient-permission`), sem mensagem nem dados pessoais. */

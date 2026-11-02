@@ -1,20 +1,20 @@
 import { Timestamp, type DocumentData, type DocumentReference, type Firestore, type WriteBatch } from 'firebase-admin/firestore'
 import type { AdminServices } from './firebaseAdmin.js'
-import { ApiError, isSuperuser, requireRole, type Actor } from './security.js'
+import { ApiError, errorCode, FULL_ACCESS_ROLES, isSuperuser, requireRole, type Actor } from './security.js'
 import { INVITE_VALID_DAYS, inviteIdFor } from './invites.js'
 import type { MutationInput, Role } from './schemas.js'
 
-const SUPERUSER_ROLES: Role[] = ['administrador', 'conselho']
-const MEMBER_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES, 'secretaria']
-const VISITOR_ROLES: Role[] = [...MEMBER_MANAGER_ROLES, 'acolhimento']
+const SUPERUSER_ROLES: Role[] = FULL_ACCESS_ROLES
+const MEMBER_MANAGER_ROLES: Role[] = SUPERUSER_ROLES
+const VISITOR_ROLES: Role[] = [...SUPERUSER_ROLES, 'acolhimento']
 const EBD_MANAGER_ROLES: Role[] = [...MEMBER_MANAGER_ROLES]
 const SOCIETY_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES]
 const FINANCE_ROLES: Role[] = [...SUPERUSER_ROLES, 'diacono']
 const ROLE_LABELS: Record<Role, string> = {
-  administrador: 'Administrador',
+  administrador: 'Administrador (antigo)',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
-  diacono: 'Junta Diaconal',
+  diacono: 'Diácono',
   professor: 'Professor',
   lider: 'Líder de sociedade',
   acolhimento: 'Acolhimento',
@@ -584,7 +584,7 @@ async function discardFinanceBatch(db: Firestore, actor: Actor, input: Extract<M
 }
 
 async function cancelFinanceEntry(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.entry.cancel' }>) {
-  requireRole(actor, FINANCE_ROLES)
+  requireRole(actor, SUPERUSER_ROLES)
   const ref = db.collection('financeEntries').doc(input.entryId)
   const result = { action: 'financeiro.contribuicao_cancelada', detail: input.reason, targetId: input.entryId }
   await db.runTransaction(async (transaction) => {
@@ -634,7 +634,7 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
   requireRole(actor, SUPERUSER_ROLES)
   if (input.userId === actor.id) throw new ApiError(403, 'self_access_change', 'Você não pode alterar o próprio acesso.')
   const classIds = input.roles.includes('professor') ? input.classIds : []
-  const societyIds = input.roles.includes('lider') ? input.societyIds : []
+  const societyIds = (input.roles as Role[]).includes('lider') ? input.societyIds : []
   await assertReferencedAccess(db, classIds, societyIds)
   const authUser = await auth.getUser(input.userId)
   if (!authUser.emailVerified) throw new ApiError(409, 'target_email_unverified', 'O e-mail precisa estar verificado antes da aprovação.')
@@ -729,7 +729,19 @@ async function linkUserPerson(db: Firestore, actor: Actor, input: Extract<Mutati
   return result!
 }
 
-async function rejectUserAccess(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'user.access.reject' }>) {
+/**
+ * Encerra as sessões do Firebase Auth de quem foi desativado. O acesso já é negado pelo perfil;
+ * se a revogação falhar, a desativação continua valendo e o erro fica no log.
+ */
+async function revokeSessions(auth: AdminServices['auth'], userId: string) {
+  try {
+    await auth.revokeRefreshTokens(userId)
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'revoke_sessions_failed', userId, errorCode: errorCode(error) }))
+  }
+}
+
+async function rejectUserAccess(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'user.access.reject' }>, auth: AdminServices['auth']) {
   requireRole(actor, SUPERUSER_ROLES)
   if (input.userId === actor.id) throw new ApiError(403, 'self_access_change', 'Você não pode alterar o próprio acesso.')
   const ref = db.collection('users').doc(input.userId)
@@ -741,6 +753,7 @@ async function rejectUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
   const result = { action: 'usuario.pedido_recusado', detail: String(target.data()?.name ?? ''), targetId: input.userId }
   addAudit(batch, db, actor, result)
   await batch.commit()
+  await revokeSessions(auth, input.userId)
   return result
 }
 
@@ -749,6 +762,7 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
   if (input.userId === actor.id) throw new ApiError(403, 'self_access_change', 'Você não pode desativar a si mesmo.')
   const authUser = await auth.getUser(input.userId)
   let result: AuditResult | undefined
+  let deactivated = false
   await db.runTransaction(async (transaction) => {
     const [target, users] = await Promise.all([
       transaction.get(db.collection('users').doc(input.userId)),
@@ -764,6 +778,7 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
       if (!profileRoles(data).length) throw new ApiError(409, 'roles_missing', 'Defina pelo menos um papel antes de reativar.')
       if (!authUser.emailVerified) throw new ApiError(409, 'target_email_unverified', 'O e-mail precisa estar verificado antes da reativação.')
     }
+    deactivated = nextStatus === 'desativado'
     transaction.update(target.ref, { status: nextStatus, emailVerified: nextStatus === 'ativo' ? true : data.emailVerified, updatedAt: Timestamp.now() })
     result = {
       action: nextStatus === 'ativo' ? 'usuario.reativado' : 'usuario.desativado',
@@ -772,7 +787,25 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
     }
     transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: Timestamp.now() })
   })
+  if (deactivated) await revokeSessions(auth, input.userId)
   return result!
+}
+
+/** Converte contas com o papel antigo `administrador` para `conselho` (mesmo acesso). */
+async function migrateAdministrators(db: Firestore, actor: Actor) {
+  requireRole(actor, SUPERUSER_ROLES)
+  const users = await db.collection('users').get()
+  if (users.size > 400) throw new ApiError(409, 'user_limit', 'A atualização excede o limite seguro de usuários.')
+  const legacy = users.docs.filter((entry) => profileRoles(entry.data()).includes('administrador'))
+  const batch = db.batch()
+  legacy.forEach((entry) => {
+    const next = [...new Set(profileRoles(entry.data()).map((role) => (role === 'administrador' ? 'conselho' : role)))]
+    batch.update(entry.ref, { roles: next, office: next.map((role) => ROLE_LABELS[role as Role] ?? role).join(', '), updatedAt: Timestamp.now() })
+  })
+  const result = { action: 'usuarios.administradores_migrados', detail: `${legacy.length} conta(s) convertida(s) para Conselho`, targetId: 'roles' }
+  addAudit(batch, db, actor, result)
+  await batch.commit()
+  return result
 }
 
 async function authUserExists(auth: AdminServices['auth'], email: string) {
@@ -878,10 +911,11 @@ export async function executeMutation(input: MutationInput, actor: Actor, servic
     case 'user.profile.update': return updateOwnProfile(db, actor, input)
     case 'user.access.save': return saveUserAccess(db, actor, input, auth)
     case 'user.person.link': return linkUserPerson(db, actor, input)
-    case 'user.access.reject': return rejectUserAccess(db, actor, input)
+    case 'user.access.reject': return rejectUserAccess(db, actor, input, auth)
     case 'user.access.toggle': return toggleUserAccess(db, actor, input, auth)
     case 'invite.create': return createInvite(db, actor, input, auth)
     case 'invite.revoke': return revokeInvite(db, actor, input)
     case 'directories.rebuild': return rebuildDirectories(db, actor)
+    case 'admins.migrate': return migrateAdministrators(db, actor)
   }
 }

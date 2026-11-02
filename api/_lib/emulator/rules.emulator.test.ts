@@ -70,15 +70,15 @@ const anonymous = () => env.unauthenticatedContext().firestore()
 type Expectation = 'allow' | 'deny'
 const readMatrix: Array<[path: string, expectations: Record<string, Expectation>]> = [
   ['members/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['memberPrivate/m1', { admin: 'allow', conselho: 'allow', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['memberDirectory/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'allow', lider: 'allow', acolhimento: 'deny' }],
+  ['memberPrivate/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['memberDirectory/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
   ['people/p1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
   ['visitors/v1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'allow' }],
-  ['financeEntries/f1', { admin: 'allow', conselho: 'allow', secretaria: 'deny', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['financeBatches/b1', { admin: 'allow', conselho: 'allow', secretaria: 'deny', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['financeDirectory/p1', { admin: 'allow', conselho: 'allow', secretaria: 'deny', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['audit/au1', { admin: 'allow', conselho: 'allow', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['invites/i1', { admin: 'allow', conselho: 'allow', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['financeEntries/f1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['financeBatches/b1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['financeDirectory/p1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['audit/au1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['invites/i1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
   ['appSettings/general', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'allow', lider: 'allow', acolhimento: 'allow' }],
   ['rateLimits/r', { admin: 'deny', conselho: 'deny', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
   ['systemCounters/people', { admin: 'deny', conselho: 'deny', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
@@ -104,6 +104,23 @@ describe('leitura por perfil', () => {
     await assertFails(getDoc(doc(db, 'ebdDirectory/e2')))
   })
 
+  it('diácono lê o financeiro inteiro, mas nada de pessoas, membros, visitantes ou EBD', async () => {
+    const db = as('diacono')
+    await assertSucceeds(getDoc(doc(db, 'financeEntries/f1')))
+    for (const path of ['people/p1', 'members/m1', 'visitors/v1', 'ebdClasses/class-1', 'ebdDirectory/e1', 'attendance/a1', 'memberDirectory/m1']) await assertFails(getDoc(doc(db, path)))
+  })
+
+  it('acolhimento lê só os visitantes', async () => {
+    const db = as('acolhimento')
+    await assertSucceeds(getDoc(doc(db, 'visitors/v1')))
+    for (const path of ['people/p1', 'members/m1', 'memberDirectory/m1', 'financeEntries/f1', 'ebdClasses/class-1', 'users/professor']) await assertFails(getDoc(doc(db, path)))
+  })
+
+  it('professor não lê a lista de membros nem as pessoas', async () => {
+    const db = as('professor')
+    for (const path of ['memberDirectory/m1', 'members/m1', 'people/p1', 'visitors/v1', 'financeEntries/f1']) await assertFails(getDoc(doc(db, path)))
+  })
+
   it('secretaria lê todas as classes e chamadas', async () => {
     await assertSucceeds(getDoc(doc(as('secretaria'), 'ebdClasses/class-2')))
     await assertSucceeds(getDoc(doc(as('secretaria'), 'attendance/a2')))
@@ -117,9 +134,10 @@ describe('leitura por perfil', () => {
     await assertFails(getDoc(doc(db, 'societyRequests/r2')))
   })
 
-  it('só o Conselho e a Administração leem a lista de usuários', async () => {
+  it('só Conselho e Secretaria leem a lista de usuários', async () => {
     await assertSucceeds(getDocs(collection(as('conselho'), 'users')))
-    await assertFails(getDocs(collection(as('secretaria'), 'users')))
+    await assertSucceeds(getDocs(collection(as('secretaria'), 'users')))
+    await assertFails(getDocs(collection(as('diacono'), 'users')))
     await assertFails(getDocs(collection(as('pendente'), 'users')))
   })
 

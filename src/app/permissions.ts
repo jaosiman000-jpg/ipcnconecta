@@ -17,6 +17,7 @@ export type Capability =
   | 'societies.request'
   | 'finance.view'
   | 'finance.manage'
+  | 'finance.cancel'
   | 'reports.view'
   | 'users.manage'
   | 'audit.view'
@@ -40,6 +41,7 @@ const allCapabilities: Capability[] = [
   'societies.request',
   'finance.view',
   'finance.manage',
+  'finance.cancel',
   'reports.view',
   'users.manage',
   'audit.view',
@@ -48,10 +50,10 @@ const allCapabilities: Capability[] = [
 ]
 
 export const ROLE_LABELS: Record<Role, string> = {
-  administrador: 'Administrador',
+  administrador: 'Administrador (antigo)',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
-  diacono: 'Junta Diaconal',
+  diacono: 'Diácono',
   professor: 'Professor',
   lider: 'Líder de sociedade',
   acolhimento: 'Acolhimento',
@@ -61,17 +63,20 @@ export function roleSummary(roles: Role[]) {
   return roles.map((role) => ROLE_LABELS[role]).join(', ')
 }
 
+/** Papéis que podem ser concedidos hoje. `administrador` é legado e `lider` está em espera (módulo Sociedades oculto). */
+export const ASSIGNABLE_ROLES: Role[] = ['conselho', 'secretaria', 'diacono', 'professor', 'acolhimento']
+
+/** Acesso completo: Conselho e Secretaria são equivalentes; `administrador` é um papel antigo mantido até a migração. */
+export const FULL_ACCESS_ROLES: Role[] = ['administrador', 'conselho', 'secretaria']
+
 const roleCapabilities: Record<Role, Capability[]> = {
   administrador: allCapabilities,
   conselho: allCapabilities,
-  secretaria: [
-    'dashboard.view', 'people.view', 'people.manage', 'members.view', 'members.manage', 'visitors.view', 'visitors.manage',
-    'ebd.view', 'ebd.manage', 'societies.view', 'reports.view', 'settings.view',
-  ],
-  diacono: ['dashboard.view', 'finance.view', 'finance.manage', 'reports.view', 'settings.view'],
-  professor: ['dashboard.view', 'ebd.view', 'ebd.attendance', 'settings.view'],
+  secretaria: allCapabilities,
+  diacono: ['dashboard.view', 'finance.view', 'finance.manage', 'settings.view'],
+  professor: ['ebd.view', 'ebd.attendance', 'settings.view'],
   lider: ['dashboard.view', 'societies.view', 'societies.request', 'settings.view'],
-  acolhimento: ['dashboard.view', 'visitors.view', 'visitors.manage', 'settings.view'],
+  acolhimento: ['visitors.view', 'visitors.manage', 'settings.view'],
 }
 
 export function hasCapability(user: User | undefined, capability: Capability) {
@@ -80,13 +85,21 @@ export function hasCapability(user: User | undefined, capability: Capability) {
 }
 
 export function isSuperuser(user: User | undefined) {
-  return Boolean(user?.roles.some((role) => role === 'administrador' || role === 'conselho'))
+  return Boolean(user?.roles.some((role) => FULL_ACCESS_ROLES.includes(role)))
+}
+
+/** Primeira tela de cada pessoa: quem não tem a Visão geral entra direto na sua área. */
+export function homePath(user: User | undefined) {
+  if (hasCapability(user, 'dashboard.view')) return '/'
+  if (hasCapability(user, 'visitors.view')) return '/visitantes'
+  if (hasCapability(user, 'ebd.view')) return '/ebd'
+  return '/configuracoes'
 }
 
 export function visibleClassIds(user: User | undefined) {
-  return isSuperuser(user) || user?.roles.includes('secretaria') ? null : user?.classIds ?? []
+  return isSuperuser(user) ? null : user?.classIds ?? []
 }
 
 export function visibleSocietyIds(user: User | undefined) {
-  return isSuperuser(user) || user?.roles.includes('secretaria') ? null : user?.societyIds ?? []
+  return isSuperuser(user) ? null : user?.societyIds ?? []
 }

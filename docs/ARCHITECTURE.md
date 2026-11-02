@@ -52,7 +52,7 @@ flowchart LR
 
 ## Autorização
 
-Administrador e Conselho são superusuários. Secretaria, Junta Diaconal, Professor, Líder e Acolhimento recebem apenas os módulos necessários. Papéis são cumulativos. Classes e sociedades também possuem escopos próprios.
+Conselho e Secretaria têm acesso completo e equivalente (o papel antigo Administrador é tratado do mesmo modo até ser convertido). Diácono, Professor e Acolhimento recebem apenas os módulos necessários; o papel Líder de sociedade está em espera. Papéis são cumulativos. Classes também possuem escopo próprio.
 
 Na aprovação de uma conta, Administrador ou Conselho deve selecionar uma pessoa já cadastrada. O backend impede que duas contas usem a mesma pessoa e registra toda criação ou correção de vínculo na auditoria.
 

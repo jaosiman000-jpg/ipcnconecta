@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './app/AuthContext'
-import { hasCapability, type Capability } from './app/permissions'
+import { hasCapability, homePath, type Capability } from './app/permissions'
 import { AppShell } from './components/AppShell'
 import { AuditPage } from './pages/AuditPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -12,7 +12,6 @@ import { MembersPage } from './pages/MembersPage'
 import { PeoplePage } from './pages/PeoplePage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { SocietiesPage } from './pages/SocietiesPage'
 import { UsersPage } from './pages/UsersPage'
 import { VisitorsPage } from './pages/VisitorsPage'
 
@@ -24,7 +23,12 @@ function ProtectedApp() {
 
 function Guard({ capability, children }: { capability: Capability; children: React.ReactNode }) {
   const { currentUser } = useAuth()
-  return hasCapability(currentUser, capability) ? children : <Navigate to="/" replace />
+  return hasCapability(currentUser, capability) ? children : <Navigate to={homePath(currentUser)} replace />
+}
+
+function Home() {
+  const { currentUser } = useAuth()
+  return hasCapability(currentUser, 'dashboard.view') ? <DashboardPage /> : <Navigate to={homePath(currentUser)} replace />
 }
 
 export function App() {
@@ -32,12 +36,11 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedApp />}>
-        <Route index element={<DashboardPage />} />
+        <Route index element={<Home />} />
         <Route path="membros" element={<Guard capability="members.view"><MembersPage /></Guard>} />
         <Route path="cadastros" element={<Guard capability="people.view"><PeoplePage /></Guard>} />
         <Route path="visitantes" element={<Guard capability="visitors.view"><VisitorsPage /></Guard>} />
         <Route path="ebd" element={<Guard capability="ebd.view"><EbdPage /></Guard>} />
-        <Route path="sociedades" element={<Guard capability="societies.view"><SocietiesPage /></Guard>} />
         <Route path="financeiro" element={<Guard capability="finance.view"><FinancePage /></Guard>} />
         <Route path="financeiro/contribuicoes/novo" element={<Guard capability="finance.manage"><ContributionWorkspacePage /></Guard>} />
         <Route path="relatorios" element={<Guard capability="reports.view"><ReportsPage /></Guard>} />

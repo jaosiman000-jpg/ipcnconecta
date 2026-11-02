@@ -49,8 +49,8 @@ export function createFakeAuth() {
   const users = new Map<string, FakeAuthUser>()
   let counter = 0
   const notFound = () => Object.assign(new Error('not found'), { code: 'auth/user-not-found' })
-  const calls = { deleted: [] as string[] }
-  const hooks: { afterCreate?: (uid: string) => Promise<void> } = {}
+  const calls = { deleted: [] as string[], revoked: [] as string[] }
+  const hooks: { afterCreate?: (uid: string) => Promise<void>; failRevoke?: boolean } = {}
 
   const auth = {
     async getUser(uid: string) {
@@ -76,6 +76,10 @@ export function createFakeAuth() {
     async deleteUser(uid: string) {
       calls.deleted.push(uid)
       users.delete(uid)
+    },
+    async revokeRefreshTokens(uid: string) {
+      if (hooks.failRevoke) throw Object.assign(new Error('revoke failed'), { code: 'auth/internal-error' })
+      calls.revoked.push(uid)
     },
     async verifyIdToken(token: string) {
       const [uid, email, verified] = token.split('|')

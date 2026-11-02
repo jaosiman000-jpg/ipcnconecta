@@ -21,7 +21,6 @@ const navItems: NavItem[] = [
   { to: '/membros', label: 'Membros', capability: 'members.view', icon: Users },
   { to: '/visitantes', label: 'Visitantes', capability: 'visitors.view', icon: UserRoundSearch },
   { to: '/ebd', label: 'Escola dominical', capability: 'ebd.view', icon: BookOpenCheck },
-  { to: '/sociedades', label: 'Sociedades', capability: 'societies.view', icon: Building2 },
   { to: '/financeiro', label: 'Financeiro', capability: 'finance.view', icon: CircleDollarSign },
   { to: '/relatorios', label: 'Relatórios', capability: 'reports.view', icon: FileSpreadsheet },
   { to: '/usuarios', label: 'Usuários e acessos', capability: 'users.manage', icon: ShieldCheck },

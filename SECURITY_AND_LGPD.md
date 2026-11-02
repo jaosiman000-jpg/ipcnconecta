@@ -44,7 +44,7 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 - Importação inicial limitada ao arquivo previamente conferido, com 210 registros, IDs e matrículas esperados, exclusão explícita e trava contra repetição.
 - Auditoria gerada no servidor, sem aceitar identidade do autor enviada pelo navegador.
 - Federação OIDC entre Vercel e Google Cloud: tokens curtos substituem arquivos JSON com chaves privadas permanentes.
-- Conta de serviço dedicada com somente os papéis necessários para Firestore e consulta ao Firebase Authentication.
+- Conta de serviço dedicada com somente os papéis necessários para Firestore e para o Firebase Authentication (consulta e criação de contas do cadastro por convite).
 - Logs da Function registram identificadores técnicos e o tipo da operação, sem nomes, e-mails, telefones ou conteúdo pastoral.
 
 ## Pendências operacionais

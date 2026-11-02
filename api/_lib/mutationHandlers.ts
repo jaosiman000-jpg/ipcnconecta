@@ -11,7 +11,6 @@ const EBD_MANAGER_ROLES: Role[] = [...MEMBER_MANAGER_ROLES]
 const SOCIETY_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES]
 const FINANCE_ROLES: Role[] = [...SUPERUSER_ROLES, 'diacono']
 const ROLE_LABELS: Record<Role, string> = {
-  administrador: 'Administrador (antigo)',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
   diacono: 'Diácono',
@@ -112,7 +111,7 @@ async function savePerson(db: Firestore, actor: Actor, input: Extract<MutationIn
     const previous = existing.data() ?? {}
     const oldMembership = previous.membership as Record<string, unknown> | undefined
     if (!isSuperuser(actor) && membershipSignature(item.membership as Record<string, unknown> | undefined) !== membershipSignature(oldMembership)) {
-      throw new ApiError(403, 'membership_permission_denied', 'Somente Conselho e Administradores podem alterar o vínculo de membro.')
+      throw new ApiError(403, 'membership_permission_denied', 'Somente Conselho e Secretaria podem alterar o vínculo de membro.')
     }
     if (!existing.exists) {
       if (!item.birthDate || !item.sex) throw new ApiError(400, 'person_required_fields', 'Informe nome, nascimento e sexo.')
@@ -661,7 +660,7 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
       : undefined
     const nextIsSuperuser = input.roles.some((role) => SUPERUSER_ROLES.includes(role))
     if (activeSuperuser(targetData) && !nextIsSuperuser && !users.docs.some((user) => user.id !== input.userId && activeSuperuser(user.data()))) {
-      throw new ApiError(409, 'last_superuser', 'O sistema precisa manter pelo menos um Administrador ou membro do Conselho ativo.')
+      throw new ApiError(409, 'last_superuser', 'O sistema precisa manter pelo menos um membro do Conselho ou da Secretaria ativo.')
     }
     transaction.update(target.ref, {
       roles: input.roles,
@@ -772,7 +771,7 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
     const data = target.data() ?? {}
     const nextStatus = data.status === 'ativo' ? 'desativado' : 'ativo'
     if (nextStatus === 'desativado' && activeSuperuser(data) && !users.docs.some((user) => user.id !== input.userId && activeSuperuser(user.data()))) {
-      throw new ApiError(409, 'last_superuser', 'Não é possível desativar o último Administrador ou membro do Conselho ativo.')
+      throw new ApiError(409, 'last_superuser', 'Não é possível desativar o último membro do Conselho ou da Secretaria ativo.')
     }
     if (nextStatus === 'ativo') {
       if (!profileRoles(data).length) throw new ApiError(409, 'roles_missing', 'Defina pelo menos um papel antes de reativar.')
@@ -789,23 +788,6 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
   })
   if (deactivated) await revokeSessions(auth, input.userId)
   return result!
-}
-
-/** Converte contas com o papel antigo `administrador` para `conselho` (mesmo acesso). */
-async function migrateAdministrators(db: Firestore, actor: Actor) {
-  requireRole(actor, SUPERUSER_ROLES)
-  const users = await db.collection('users').get()
-  if (users.size > 400) throw new ApiError(409, 'user_limit', 'A atualização excede o limite seguro de usuários.')
-  const legacy = users.docs.filter((entry) => profileRoles(entry.data()).includes('administrador'))
-  const batch = db.batch()
-  legacy.forEach((entry) => {
-    const next = [...new Set(profileRoles(entry.data()).map((role) => (role === 'administrador' ? 'conselho' : role)))]
-    batch.update(entry.ref, { roles: next, office: next.map((role) => ROLE_LABELS[role as Role] ?? role).join(', '), updatedAt: Timestamp.now() })
-  })
-  const result = { action: 'usuarios.administradores_migrados', detail: `${legacy.length} conta(s) convertida(s) para Conselho`, targetId: 'roles' }
-  addAudit(batch, db, actor, result)
-  await batch.commit()
-  return result
 }
 
 async function authUserExists(auth: AdminServices['auth'], email: string) {
@@ -916,6 +898,5 @@ export async function executeMutation(input: MutationInput, actor: Actor, servic
     case 'invite.create': return createInvite(db, actor, input, auth)
     case 'invite.revoke': return revokeInvite(db, actor, input)
     case 'directories.rebuild': return rebuildDirectories(db, actor)
-    case 'admins.migrate': return migrateAdministrators(db, actor)
   }
 }

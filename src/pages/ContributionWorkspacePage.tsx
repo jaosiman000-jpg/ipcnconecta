@@ -143,7 +143,7 @@ export function ContributionWorkspacePage() {
 
   return (
     <div className="page contribution-workspace-page">
-      <header className="contribution-workspace-header"><div><Link to="/financeiro" className="workspace-back"><ArrowLeft size={18} /> Voltar ao financeiro</Link><p className="eyebrow">Junta Diaconal</p><h1>Registrar contribuições</h1><p>Adicione os recebimentos do dia e finalize o lote após a conferência.</p></div><span className="draft-badge">Rascunho</span></header>
+      <header className="contribution-workspace-header"><div><Link to="/financeiro" className="workspace-back"><ArrowLeft size={18} /> Voltar ao financeiro</Link><p className="eyebrow">Diácono</p><h1>Registrar contribuições</h1><p>Adicione os recebimentos do dia e finalize o lote após a conferência.</p></div><span className="draft-badge">Rascunho</span></header>
       <div className="contribution-layout">
         <section className="panel contribution-composer"><div className="contribution-section-title"><div><span>1</span><div><h2>Nova contribuição</h2><p>Preencha uma pessoa por vez.</p></div></div><Field label="Data do recebimento"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field></div>
           <form onSubmit={addItem}>

@@ -217,7 +217,7 @@ export function EbdPage() {
           <div className="form-grid two-columns"><Field label="Nome da classe *"><input name="name" required defaultValue={editing?.name} /></Field><Field label="Descrição"><input name="description" defaultValue={editing?.description} /></Field></div>
           <label className="check-row inline-check"><input name="active" type="checkbox" defaultChecked={editing?.active ?? true} /><span><strong>Classe ativa</strong></span></label>
           <div className="assignment-grid single">
-            <fieldset><legend>Professores</legend><div className="selection-list">{accountUsers.filter((user) => user.status === 'ativo' && (user.roles.includes('professor') || user.roles.includes('administrador') || user.roles.includes('conselho'))).map((user) => <label key={user.id}><input type="checkbox" name="teachers" value={user.id} defaultChecked={editing?.teacherIds.includes(user.id)} /><span>{user.name}<small>{user.email}</small></span></label>)}</div></fieldset>
+            <fieldset><legend>Professores</legend><div className="selection-list">{accountUsers.filter((user) => user.status === 'ativo' && (user.roles.includes('professor') || user.roles.includes('conselho') || user.roles.includes('secretaria'))).map((user) => <label key={user.id}><input type="checkbox" name="teachers" value={user.id} defaultChecked={editing?.teacherIds.includes(user.id)} /><span>{user.name}<small>{user.email}</small></span></label>)}</div></fieldset>
           </div>
           <FormActions onCancel={() => setClassOpen(false)} />
         </form>

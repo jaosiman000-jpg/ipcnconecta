@@ -1,5 +1,4 @@
 export type Role =
-  | 'administrador'
   | 'conselho'
   | 'secretaria'
   | 'diacono'

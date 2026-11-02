@@ -11,7 +11,7 @@ const profile = (roles: string[], extra: Record<string, unknown> = {}) => ({
 })
 
 const people: Record<string, Record<string, unknown>> = {
-  admin: profile(['administrador']),
+  legado: profile(['administrador']),
   conselho: profile(['conselho']),
   secretaria: profile(['secretaria']),
   diacono: profile(['diacono']),
@@ -19,8 +19,8 @@ const people: Record<string, Record<string, unknown>> = {
   lider: profile(['lider'], { societyIds: ['soc-1'] }),
   acolhimento: profile(['acolhimento']),
   pendente: profile([], { status: 'pendente' }),
-  desativado: profile(['administrador'], { status: 'desativado' }),
-  naoVerificado: profile(['administrador'], { emailVerified: false }),
+  desativado: profile(['conselho'], { status: 'desativado' }),
+  naoVerificado: profile(['conselho'], { emailVerified: false }),
 }
 
 beforeAll(async () => {
@@ -69,19 +69,19 @@ const anonymous = () => env.unauthenticatedContext().firestore()
 
 type Expectation = 'allow' | 'deny'
 const readMatrix: Array<[path: string, expectations: Record<string, Expectation>]> = [
-  ['members/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['memberPrivate/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['memberDirectory/m1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['people/p1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['visitors/v1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'allow' }],
-  ['financeEntries/f1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['financeBatches/b1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['financeDirectory/p1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['audit/au1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['invites/i1', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['appSettings/general', { admin: 'allow', conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'allow', lider: 'allow', acolhimento: 'allow' }],
-  ['rateLimits/r', { admin: 'deny', conselho: 'deny', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
-  ['systemCounters/people', { admin: 'deny', conselho: 'deny', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['members/m1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['memberPrivate/m1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['memberDirectory/m1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['people/p1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['visitors/v1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'allow' }],
+  ['financeEntries/f1', { conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['financeBatches/b1', { conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['financeDirectory/p1', { conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['audit/au1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['invites/i1', { conselho: 'allow', secretaria: 'allow', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['appSettings/general', { conselho: 'allow', secretaria: 'allow', diacono: 'allow', professor: 'allow', lider: 'allow', acolhimento: 'allow' }],
+  ['rateLimits/r', { conselho: 'deny', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
+  ['systemCounters/people', { conselho: 'deny', secretaria: 'deny', diacono: 'deny', professor: 'deny', lider: 'deny', acolhimento: 'deny' }],
 ]
 
 describe('leitura por perfil', () => {
@@ -121,6 +121,11 @@ describe('leitura por perfil', () => {
     for (const path of ['memberDirectory/m1', 'members/m1', 'people/p1', 'visitors/v1', 'financeEntries/f1']) await assertFails(getDoc(doc(db, path)))
   })
 
+  it('o papel antigo Administrador não dá mais acesso aos dados', async () => {
+    const restricted = readMatrix.filter(([path, expectations]) => path !== 'appSettings/general' && expectations.conselho === 'allow')
+    for (const [path] of restricted) await assertFails(getDoc(doc(as('legado'), path)))
+  })
+
   it('secretaria lê todas as classes e chamadas', async () => {
     await assertSucceeds(getDoc(doc(as('secretaria'), 'ebdClasses/class-2')))
     await assertSucceeds(getDoc(doc(as('secretaria'), 'attendance/a2')))
@@ -149,7 +154,7 @@ describe('leitura por perfil', () => {
 })
 
 describe('contas sem acesso ativo', () => {
-  const paths = readMatrix.filter(([, expectations]) => expectations.admin === 'allow').map(([path]) => path)
+  const paths = readMatrix.filter(([, expectations]) => expectations.conselho === 'allow').map(([path]) => path)
 
   ;['pendente', 'desativado', 'naoVerificado'].forEach((account) => {
     it(`${account} não lê nenhum dado administrativo`, async () => {
@@ -167,15 +172,15 @@ describe('escritas pelo navegador', () => {
   const targets = ['members/m1', 'memberDirectory/m1', 'memberPrivate/m1', 'people/p1', 'visitors/v1', 'ebdClasses/class-1', 'attendance/a1', 'societies/soc-1',
     'societyRequests/r1', 'financeEntries/f1', 'financeBatches/b1', 'financeDirectory/p1', 'ebdDirectory/e1', 'appSettings/general', 'audit/au1', 'invites/i1', 'rateLimits/r', 'systemCounters/people']
 
-  it('nenhum perfil, nem o Administrador, grava diretamente', async () => {
-    for (const role of ['admin', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']) {
+  it('nenhum perfil, nem o Conselho, grava diretamente', async () => {
+    for (const role of ['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']) {
       for (const path of targets) await assertFails(setDoc(doc(as(role), path), { hacked: true }))
     }
   })
 
   it('ninguém apaga perfis', async () => {
     const { deleteDoc } = await import('firebase/firestore')
-    await assertFails(deleteDoc(doc(as('admin'), 'users/professor')))
+    await assertFails(deleteDoc(doc(as('conselho'), 'users/professor')))
   })
 })
 
@@ -192,8 +197,8 @@ describe('perfis de usuário', () => {
   })
 
   it('não permite se promover nem se ativar', async () => {
-    await assertFails(updateDoc(doc(as('pendente'), 'users/pendente'), { roles: ['administrador'], status: 'ativo', updatedAt: serverTimestamp() }))
-    await assertFails(updateDoc(doc(as('professor'), 'users/professor'), { roles: ['administrador'], updatedAt: serverTimestamp() }))
+    await assertFails(updateDoc(doc(as('pendente'), 'users/pendente'), { roles: ['conselho'], status: 'ativo', updatedAt: serverTimestamp() }))
+    await assertFails(updateDoc(doc(as('professor'), 'users/professor'), { roles: ['conselho'], updatedAt: serverTimestamp() }))
   })
 
   it('permite sincronizar a verificação do próprio e-mail', async () => {

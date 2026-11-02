@@ -50,7 +50,6 @@ const allCapabilities: Capability[] = [
 ]
 
 export const ROLE_LABELS: Record<Role, string> = {
-  administrador: 'Administrador (antigo)',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
   diacono: 'Diácono',
@@ -63,14 +62,13 @@ export function roleSummary(roles: Role[]) {
   return roles.map((role) => ROLE_LABELS[role]).join(', ')
 }
 
-/** Papéis que podem ser concedidos hoje. `administrador` é legado e `lider` está em espera (módulo Sociedades oculto). */
+/** Papéis que podem ser concedidos hoje. `lider` está em espera (módulo Sociedades oculto). */
 export const ASSIGNABLE_ROLES: Role[] = ['conselho', 'secretaria', 'diacono', 'professor', 'acolhimento']
 
-/** Acesso completo: Conselho e Secretaria são equivalentes; `administrador` é um papel antigo mantido até a migração. */
-export const FULL_ACCESS_ROLES: Role[] = ['administrador', 'conselho', 'secretaria']
+/** Acesso completo: Conselho e Secretaria são equivalentes. */
+export const FULL_ACCESS_ROLES: Role[] = ['conselho', 'secretaria']
 
 const roleCapabilities: Record<Role, Capability[]> = {
-  administrador: allCapabilities,
   conselho: allCapabilities,
   secretaria: allCapabilities,
   diacono: ['dashboard.view', 'finance.view', 'finance.manage', 'settings.view'],

@@ -8,13 +8,12 @@ import { Field, PageHeader } from '../components/Common'
 import { ProfilePhotoField } from '../components/ProfilePhotoField'
 
 export function SettingsPage() {
-  const { currentUser, updateOwnProfile, accountUsers } = useAuth()
+  const { currentUser, updateOwnProfile } = useAuth()
   const [name, setName] = useState(currentUser?.name ?? '')
   const [profilePhoto, setProfilePhoto] = useState<ProfilePhotoSelection | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
-  const [migrateState, setMigrateState] = useState<'idle' | 'running' | 'done' | string>('idle')
   const [rebuildState, setRebuildState] = useState<'idle' | 'running' | 'done' | string>('idle')
 
   useEffect(() => {
@@ -44,16 +43,6 @@ export function SettingsPage() {
     }
   }
 
-  async function migrateAdministrators() {
-    setMigrateState('running')
-    try {
-      await callSecureMutation({ type: 'admins.migrate' })
-      setMigrateState('done')
-    } catch (migrateError) {
-      setMigrateState(migrateError instanceof Error ? migrateError.message : 'Não foi possível concluir a operação.')
-    }
-  }
-
   async function rebuildDirectories() {
     setRebuildState('running')
     try {
@@ -76,7 +65,7 @@ export function SettingsPage() {
               <Field label="Nome"><input value={name} onChange={(event) => setName(event.target.value)} required minLength={3} maxLength={120} autoComplete="name" /></Field>
               <div className="account-access" aria-labelledby="account-access-title">
                 <div className="account-access-heading"><ShieldCheck size={19} aria-hidden="true" /><h3 id="account-access-title">Seus acessos</h3></div>
-                <p>Somente Administradores e Conselho podem alterar estas permissões.</p>
+                <p>Somente Conselho e Secretaria podem alterar estas permissões.</p>
                 <div className="role-tags">{currentUser.roles.map((role) => <span key={role}>{ROLE_LABELS[role]}</span>)}</div>
               </div>
             </div>
@@ -85,12 +74,8 @@ export function SettingsPage() {
           <div className="profile-settings-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar alterações'}</button>{saved && <span className="save-feedback" role="status">Perfil atualizado.</span>}</div>
         </form>
       </section>
-      {isSuperuser(currentUser) && accountUsers.some((user) => user.roles.includes('administrador')) && <section className="panel">
-        <div className="settings-heading"><span><ShieldCheck size={21} /></span><div><h2>Papel Administrador (antigo)</h2><p>O papel Administrador foi substituído por Conselho, que tem o mesmo acesso. Converte as contas que ainda usam o papel antigo.</p></div></div>
-        <div className="profile-settings-actions"><button className="button secondary" type="button" onClick={migrateAdministrators} disabled={migrateState === 'running'}>{migrateState === 'running' ? 'Convertendo…' : 'Converter para Conselho'}</button>{migrateState === 'done' && <span className="save-feedback" role="status">Contas convertidas.</span>}{migrateState !== 'idle' && migrateState !== 'running' && migrateState !== 'done' && <p className="form-error" role="alert">{migrateState}</p>}</div>
-      </section>}
       {isSuperuser(currentUser) && <section className="panel">
-        <div className="settings-heading"><span><DatabaseZap size={21} /></span><div><h2>Diretórios de consulta</h2><p>Recria, a partir dos cadastros de pessoas, as listas mínimas usadas por professores, líderes e Junta Diaconal. Use após atualizações de segurança ou se alguma lista parecer desatualizada.</p></div></div>
+        <div className="settings-heading"><span><DatabaseZap size={21} /></span><div><h2>Diretórios de consulta</h2><p>Recria, a partir dos cadastros de pessoas, as listas mínimas usadas por professores, líderes e diáconos. Use após atualizações de segurança ou se alguma lista parecer desatualizada.</p></div></div>
         <div className="profile-settings-actions"><button className="button secondary" type="button" onClick={rebuildDirectories} disabled={rebuildState === 'running'}>{rebuildState === 'running' ? 'Reconstruindo…' : 'Reconstruir diretórios'}</button>{rebuildState === 'done' && <span className="save-feedback" role="status">Diretórios atualizados.</span>}{rebuildState !== 'idle' && rebuildState !== 'running' && rebuildState !== 'done' && <p className="form-error" role="alert">{rebuildState}</p>}</div>
       </section>}
     </div>

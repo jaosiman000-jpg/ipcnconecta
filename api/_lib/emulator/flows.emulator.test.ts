@@ -30,14 +30,15 @@ describe('autenticação da API', () => {
 
   it('recusa conta pendente, desativada, sem papéis ou sem perfil', async () => {
     await seedUser(db, 'pendente', { status: 'pendente' })
-    await seedUser(db, 'desativado', { status: 'desativado', roles: ['administrador'] })
+    await seedUser(db, 'desativado', { status: 'desativado', roles: ['conselho'] })
+    await seedUser(db, 'legado', { roles: ['administrador'] })
     await seedUser(db, 'sempapel', { roles: [] })
-    for (const uid of ['pendente', 'desativado', 'sempapel']) await expectApiError(authenticate(token(uid), fake.auth, db), 'account_inactive', 403)
+    for (const uid of ['pendente', 'desativado', 'sempapel', 'legado']) await expectApiError(authenticate(token(uid), fake.auth, db), 'account_inactive', 403)
     await expectApiError(authenticate(token('fantasma'), fake.auth, db), 'profile_missing', 403)
   })
 
   it('recusa quando o e-mail do token difere do perfil', async () => {
-    await seedUser(db, 'u1', { roles: ['administrador'] })
+    await seedUser(db, 'u1', { roles: ['conselho'] })
     await expectApiError(authenticate(token('u1', 'outro@example.com'), fake.auth, db), 'account_inactive', 403)
   })
 
@@ -101,7 +102,7 @@ describe('chamada da EBD', () => {
   })
 })
 
-describe('financeiro da Junta Diaconal', () => {
+describe('financeiro do Diácono', () => {
   const diacono = actorFor(['diacono'], { id: 'diacono-1', name: 'Diácono Um' })
   const outroDiacono = actorFor(['diacono'], { id: 'diacono-2', name: 'Diácono Dois' })
   const batch = (items?: unknown[]) => ({
@@ -205,21 +206,9 @@ describe('aprovação e governança de acessos', () => {
     expect((await db.collection('users').doc('novo').get()).data()?.status).toBe('ativo')
   })
 
-  it('não concede o papel antigo Administrador nem o Líder de sociedade', () => {
+  it('não concede o papel extinto Administrador nem o Líder de sociedade', () => {
     expect(mutationSchema.safeParse(approve({ roles: ['administrador'] })).success).toBe(false)
     expect(mutationSchema.safeParse(approve({ roles: ['lider'] })).success).toBe(false)
-  })
-
-  it('converte as contas Administrador (antigo) para Conselho', async () => {
-    await seedUser(db, 'legado-1', { roles: ['administrador'], office: 'Administrador' })
-    await seedUser(db, 'legado-2', { roles: ['administrador', 'conselho', 'professor'] })
-    await run({ type: 'admins.migrate' }, conselho)
-
-    expect((await db.collection('users').doc('legado-1').get()).data()).toMatchObject({ roles: ['conselho'], office: 'Conselho' })
-    expect((await db.collection('users').doc('legado-2').get()).data()?.roles).toEqual(['conselho', 'professor'])
-    expect((await db.collection('users').doc('su-1').get()).data()?.roles).toEqual(['conselho'])
-    expect(await actions()).toContain('usuarios.administradores_migrados')
-    await expectApiError(run({ type: 'admins.migrate' }, actorFor(['diacono'])), 'permission_denied', 403)
   })
 
   it('ninguém altera o próprio acesso', async () => {
@@ -240,7 +229,7 @@ describe('aprovação e governança de acessos', () => {
     await expectApiError(run(approve({ classIds: ['nao-existe'] }), conselho), 'access_scope_invalid', 400)
   })
 
-  it('preserva sempre ao menos um Administrador ou Conselho ativo', async () => {
+  it('preserva sempre ao menos um Conselho ou Secretaria ativo', async () => {
     fake.users.set('su-2', { uid: 'su-2', email: 'su-2@example.com', emailVerified: true })
     await expectApiError(run(approve({ userId: 'su-1', roles: ['professor'] }), actorFor(['conselho'], { id: 'su-2' })), 'last_superuser', 409)
     await expectApiError(run({ type: 'user.access.toggle', userId: 'su-1' }, actorFor(['conselho'], { id: 'su-2' })), 'last_superuser', 409)

@@ -20,10 +20,9 @@ service cloud.firestore {
       return activeUser() && ownProfile().roles.hasAny(roles);
     }
 
-    // Acesso completo: Conselho e Secretaria são equivalentes. `administrador` é um papel
-    // antigo mantido até a migração das contas (Configurações > Converter para Conselho).
+    // Acesso completo: Conselho e Secretaria são equivalentes.
     function superuser() {
-      return hasRole(['administrador', 'conselho', 'secretaria']);
+      return hasRole(['conselho', 'secretaria']);
     }
 
     function memberManager() {
@@ -36,7 +35,7 @@ service cloud.firestore {
     }
 
     function visitorTeam() {
-      return hasRole(['administrador', 'conselho', 'secretaria', 'acolhimento']);
+      return hasRole(['conselho', 'secretaria', 'acolhimento']);
     }
 
     function ebdManager() {
@@ -66,7 +65,7 @@ service cloud.firestore {
     }
 
     function financeTeam() {
-      return hasRole(['administrador', 'conselho', 'secretaria', 'diacono']);
+      return hasRole(['conselho', 'secretaria', 'diacono']);
     }
 
     function validSelfVerification() {

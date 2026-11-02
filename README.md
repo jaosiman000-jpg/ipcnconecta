@@ -29,7 +29,7 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Visitantes, consentimento e contato manual pelo WhatsApp.
 - Classes, professores, alunos, chamadas aos domingos e relatórios da EBD.
 - Sociedades internas UCP, UPA, UMP, UPH e SAF.
-- Financeiro da Junta Diaconal com lotes de dízimos, ofertas e missões em dinheiro ou PIX.
+- Financeiro do Diácono com lotes de dízimos, ofertas e missões em dinheiro ou PIX.
 - Relatórios e exportação de planilhas.
 - Auditoria das alterações.
 - Sincronização em tempo real entre computadores e celulares.
@@ -50,7 +50,7 @@ Uploads de documentos e comprovantes já possuem código e regras preparados, ma
 | Acolhimento | Apenas a aba Visitantes: cadastro, consulta e mensagem de contato |
 | Líder de sociedade | Em espera: o módulo Sociedades está oculto e o papel não é oferecido nos convites |
 
-O papel antigo **Administrador** foi substituído pelo Conselho. Contas que ainda o têm mantêm acesso total até serem convertidas em Configurações > "Converter para Conselho".
+O papel antigo **Administrador** foi extinto e substituído pelo Conselho. Uma conta que ainda o tivesse ficaria sem acesso até receber um dos papéis atuais.
 
 Itens sem permissão não aparecem na interface. As regras do Firestore repetem a autorização no banco; esconder um botão não é tratado como controle de segurança.
 

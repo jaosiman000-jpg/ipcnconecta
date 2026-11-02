@@ -8,14 +8,12 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  createUserWithEmailAndPassword,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
-  updateProfile,
   type User as FirebaseUser,
 } from 'firebase/auth'
 import {
@@ -25,7 +23,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -33,20 +30,14 @@ import {
 } from 'firebase/firestore'
 import { configureAuthPersistence, firebaseAuth, firebaseConfigured, firestore } from './firebase'
 import { isSuperuser } from './permissions'
-import { callSecureMutation } from './secureApi'
-import type { Role, User } from './types'
-
-export const PRIVACY_NOTICE_VERSION = '2026-10-26'
+import { callSecureMutation, registerWithInvite } from './secureApi'
+import type { Invite, Role, User } from './types'
 
 export interface AccessRequest {
   name: string
   email: string
   password: string
   photo: string
-  office: string
-  requestedRoles: Role[]
-  classIds: string[]
-  societyIds: string[]
 }
 
 export interface AccessUpdate {
@@ -69,6 +60,7 @@ interface AuthContextValue {
   profile?: User
   currentUser?: User
   accountUsers: User[]
+  invites: Invite[]
   login: (email: string, password: string, remember: boolean) => Promise<string | null>
   logout: () => Promise<void>
   requestAccess: (request: AccessRequest) => Promise<string | null>
@@ -80,6 +72,8 @@ interface AuthContextValue {
   linkPerson: (user: User, personId: string) => Promise<string | null>
   rejectAccess: (user: User) => Promise<string | null>
   toggleAccount: (user: User) => Promise<string | null>
+  createInvite: (email: string, roles: Role[]) => Promise<string | null>
+  revokeInvite: (invite: Invite) => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -113,6 +107,19 @@ function dataToUser(id: string, data: DocumentData): User {
   }
 }
 
+function snapshotToInvite(snapshot: QueryDocumentSnapshot<DocumentData>): Invite {
+  const data = snapshot.data()
+  return {
+    id: snapshot.id,
+    email: String(data.email ?? ''),
+    roles: Array.isArray(data.roles) ? data.roles as Role[] : [],
+    status: data.status === 'usado' || data.status === 'revogado' ? data.status : 'pendente',
+    createdByName: String(data.createdByName ?? ''),
+    createdAt: iso(data.createdAt),
+    expiresAt: iso(data.expiresAt),
+  }
+}
+
 function snapshotToUser(snapshot: QueryDocumentSnapshot<DocumentData>) {
   return dataToUser(snapshot.id, snapshot.data())
 }
@@ -139,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null)
   const [profile, setProfile] = useState<User>()
   const [accountUsers, setAccountUsers] = useState<User[]>([])
+  const [invites, setInvites] = useState<Invite[]>([])
 
   useEffect(() => {
     if (!firebaseAuth || !firestore) {
@@ -192,6 +200,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [profile])
 
+  useEffect(() => {
+    if (!firestore || !profile || !isSuperuser(profile) || profile.status !== 'ativo') {
+      setInvites([])
+      return
+    }
+    return onSnapshot(query(collection(firestore, 'invites'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setInvites(snapshot.docs.map(snapshotToInvite))
+    })
+  }, [profile])
+
   const currentUser = profile?.status === 'ativo' && authUser?.emailVerified ? profile : undefined
 
   const login = useCallback(async (email: string, password: string, remember: boolean) => {
@@ -210,34 +228,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const requestAccess = useCallback(async (request: AccessRequest) => {
-    if (!firebaseAuth || !firestore) return 'O Firebase ainda não foi configurado neste ambiente.'
+    if (!firebaseAuth) return 'O Firebase ainda não foi configurado neste ambiente.'
     try {
+      await registerWithInvite({ ...request, privacyNotice: true })
       await configureAuthPersistence(false)
-      const credential = await createUserWithEmailAndPassword(firebaseAuth, request.email, request.password)
-      await updateProfile(credential.user, { displayName: request.name })
-      await setDoc(doc(firestore, 'users', credential.user.uid), {
-        uid: credential.user.uid,
-        name: request.name,
-        email: request.email,
-        photo: request.photo,
-        office: request.office,
-        emailVerified: false,
-        roles: [],
-        requestedRoles: request.requestedRoles,
-        status: 'pendente',
-        classIds: request.classIds,
-        societyIds: request.societyIds,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
-        privacyNoticeAcceptedAt: serverTimestamp(),
-      })
+      const credential = await signInWithEmailAndPassword(firebaseAuth, request.email, request.password)
       await sendEmailVerification(credential.user, { url: window.location.origin + '/login' })
       await signOut(firebaseAuth)
       return null
     } catch (error) {
       if (firebaseAuth.currentUser) await signOut(firebaseAuth)
-      return authError(error)
+      return error instanceof Error && !('code' in error) ? error.message : authError(error)
     }
   }, [])
 
@@ -320,6 +321,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser])
 
+  const createInvite = useCallback(async (email: string, roles: Role[]) => {
+    if (!currentUser || !isSuperuser(currentUser)) return 'Ação não permitida.'
+    try {
+      await callSecureMutation({ type: 'invite.create', email: email.trim().toLowerCase(), roles })
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : authError(error)
+    }
+  }, [currentUser])
+
+  const revokeInvite = useCallback(async (invite: Invite) => {
+    if (!currentUser || !isSuperuser(currentUser)) return 'Ação não permitida.'
+    try {
+      await callSecureMutation({ type: 'invite.revoke', inviteId: invite.id })
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : authError(error)
+    }
+  }, [currentUser])
+
   const value = useMemo<AuthContextValue>(() => ({
     configured: firebaseConfigured,
     loading,
@@ -327,6 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     currentUser,
     accountUsers,
+    invites,
     login,
     logout,
     requestAccess,
@@ -338,7 +360,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     linkPerson,
     rejectAccess,
     toggleAccount,
-  }), [loading, authUser, profile, currentUser, accountUsers, login, logout, requestAccess, resendVerification, refreshAccount, resetPassword, updateOwnProfile, saveAccess, linkPerson, rejectAccess, toggleAccount])
+    createInvite,
+    revokeInvite,
+  }), [loading, authUser, profile, currentUser, accountUsers, invites, login, logout, requestAccess, resendVerification, refreshAccount, resetPassword, updateOwnProfile, saveAccess, linkPerson, rejectAccess, toggleAccount, createInvite, revokeInvite])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { browserLocalPersistence, browserSessionPersistence, getAuth, setPersistence } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { browserLocalPersistence, browserSessionPersistence, connectAuthEmulator, getAuth, setPersistence } from 'firebase/auth'
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -19,6 +19,12 @@ const app = firebaseConfigured ? (getApps().length ? getApp() : initializeApp(fi
 export const firebaseAuth = app ? getAuth(app) : null
 export const firestore = app ? getFirestore(app) : null
 export const firebaseStorage = app ? getStorage(app) : null
+
+// `npm run dev:emulator` usa um projeto de demonstração local, sem tocar nos dados reais.
+if (import.meta.env.VITE_USE_EMULATORS === 'true' && firebaseAuth && firestore && !(firebaseAuth as { emulatorConfig?: unknown }).emulatorConfig) {
+  connectAuthEmulator(firebaseAuth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  connectFirestoreEmulator(firestore, '127.0.0.1', 8080)
+}
 
 export function configureAuthPersistence(remember: boolean) {
   return firebaseAuth

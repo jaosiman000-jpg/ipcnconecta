@@ -1,18 +1,12 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowRight, CheckCircle2, Eye, EyeOff, MailCheck, ShieldCheck } from 'lucide-react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
-import { ROLE_LABELS, roleSummary } from '../app/permissions'
 import { createProfileThumbnail, type ProfilePhotoSelection } from '../app/profilePhoto'
-import type { Role } from '../app/types'
-import { CustomSelect, Field, FormActions, Modal } from '../components/Common'
+import { Field, FormActions, Modal } from '../components/Common'
 import { ProfilePhotoField } from '../components/ProfilePhotoField'
 
-const requestableRoles: Role[] = ['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
-
 export function LoginPage() {
-  const { data } = useApp()
   const {
     configured, loading, authUser, profile, currentUser, login, logout, requestAccess,
     resendVerification, refreshAccount, resetPassword,
@@ -61,11 +55,9 @@ export function LoginPage() {
     event.preventDefault()
     if (busy) return
     const form = new FormData(event.currentTarget)
-    const roles = requestableRoles.filter((role) => form.getAll('roles').includes(role))
     const requestPassword = String(form.get('password'))
     const passwordConfirmation = String(form.get('passwordConfirmation'))
 
-    if (!roles.length) return setError('Escolha pelo menos uma atuação.')
     if (requestPassword.length < 8) return setError('A senha precisa ter pelo menos 8 caracteres.')
     if (requestPassword !== passwordConfirmation) return setError('As senhas não coincidem.')
     if (!profilePhoto) return setError('Escolha uma foto de perfil.')
@@ -79,10 +71,6 @@ export function LoginPage() {
         email: String(form.get('email')).trim().toLowerCase(),
         password: requestPassword,
         photo,
-        office: roleSummary(roles),
-        requestedRoles: roles,
-        classIds: form.get('classId') ? [String(form.get('classId'))] : [],
-        societyIds: form.get('societyId') ? [String(form.get('societyId'))] : [],
       })
       if (message) setError(message)
       else setRequestSent(true)
@@ -133,12 +121,12 @@ export function LoginPage() {
             <button className="button primary button-block" type="submit" disabled={busy || !configured}>{busy ? 'Entrando…' : <>Entrar <ArrowRight size={18} /></>}</button>
           </form>
           <button className="text-button" type="button" onClick={handlePasswordReset} disabled={busy}>Esqueci minha senha</button>
-          <button className="text-button" type="button" onClick={() => { setError(''); setRequestSent(false); setRequestOpen(true) }} disabled={!configured}>Primeiro acesso? Solicitar cadastro</button>
+          <button className="text-button" type="button" onClick={() => { setError(''); setRequestSent(false); setRequestOpen(true) }} disabled={!configured}>Recebi um convite? Criar minha conta</button>
           {!configured && <div className="configuration-box"><strong>Firebase não configurado</strong><p>Adicione as variáveis do projeto para ativar o login real.</p></div>}
         </div>
       </main>
 
-      <Modal title="Solicitar acesso" description="Após verificar o e-mail, o Conselho ou Administrador revisará os dados e definirá as permissões." open={requestOpen} onClose={() => setRequestOpen(false)} wide>
+      <Modal title="Criar conta" description="Use o mesmo e-mail que recebeu o convite do Conselho ou da Administração. Depois de verificar o e-mail, eles definirão suas permissões." open={requestOpen} onClose={() => setRequestOpen(false)} wide>
         {requestSent ? (
           <div className="success-state"><CheckCircle2 size={40} /><h3>Verifique seu e-mail</h3><p>Enviamos um link de confirmação. Depois disso, seu cadastro ficará disponível para aprovação.</p><button className="button primary" type="button" onClick={() => setRequestOpen(false)}>Concluir</button></div>
         ) : (
@@ -149,11 +137,6 @@ export function LoginPage() {
               <ProfilePhotoField onChange={setProfilePhoto} resetKey={requestOpen} />
               <Field className="access-request-password" label="Senha" hint="Use pelo menos 8 caracteres."><input name="password" type="password" required minLength={8} maxLength={72} autoComplete="new-password" /></Field>
               <Field className="access-request-confirmation" label="Confirmar senha"><input name="passwordConfirmation" type="password" required minLength={8} maxLength={72} autoComplete="new-password" /></Field>
-            </div>
-            <fieldset className="role-picker"><legend>Quais atuações você exerce?</legend><div className="checkbox-grid">{requestableRoles.map((role) => <label key={role}><input type="checkbox" name="roles" value={role} /> <span>{ROLE_LABELS[role]}</span></label>)}</div></fieldset>
-            <div className="form-grid two-columns">
-              <div className="field"><span>Classe da EBD (se professor)</span><CustomSelect name="classId" label="Classe da EBD" options={[{ value: '', label: 'Nenhuma / definir depois' }, ...data.classes.map((item) => ({ value: item.id, label: item.name }))]} /></div>
-              <div className="field"><span>Sociedade (se líder)</span><CustomSelect name="societyId" label="Sociedade" options={[{ value: '', label: 'Nenhuma / definir depois' }, ...data.societies.map((item) => ({ value: item.id, label: `${item.code} — ${item.name}` }))]} /></div>
             </div>
             <label className="privacy-acknowledgement"><input type="checkbox" required name="privacyNotice" /><span>Li o aviso de privacidade e estou ciente de que estes dados serão usados para analisar e administrar meu acesso ao IPCN Conecta.</span></label>
             {error && <p className="form-error" role="alert">{error}</p>}

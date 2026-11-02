@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Check, Link2, MailCheck, MailWarning, Pencil, ShieldCheck, UserCheck, UserX, X } from 'lucide-react'
+import { Check, Link2, MailCheck, MailPlus, MailWarning, Pencil, ShieldCheck, UserCheck, UserX, X } from 'lucide-react'
 import { useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
 import { displayDateTime } from '../app/format'
@@ -51,13 +51,14 @@ function PersonLinkPicker({ people, users, user, selectedId, search, onSearch, o
 
 export function UsersPage() {
   const { data } = useApp()
-  const { accountUsers, currentUser, saveAccess: saveRemoteAccess, linkPerson, rejectAccess, toggleAccount } = useAuth()
+  const { accountUsers, invites, currentUser, saveAccess: saveRemoteAccess, linkPerson, rejectAccess, toggleAccount, createInvite, revokeInvite } = useAuth()
   const [editing, setEditing] = useState<User | null>(null)
   const [linking, setLinking] = useState<User | null>(null)
   const [selectedPersonId, setSelectedPersonId] = useState('')
   const [personSearch, setPersonSearch] = useState('')
   const pending = accountUsers.filter((user) => user.status === 'pendente')
   const active = accountUsers.filter((user) => user.status !== 'pendente')
+  const openInvites = invites.filter((invite) => invite.status === 'pendente' && new Date(invite.expiresAt).getTime() > Date.now())
 
   function startPersonSelection(user: User) {
     const person = data.people.find((item) => item.id === user.personId)
@@ -121,6 +122,27 @@ export function UsersPage() {
     else setLinking(null)
   }
 
+  async function submitInvite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
+    const inviteRoles = roles.filter((role) => form.getAll('roles').includes(role))
+    if (!inviteRoles.length) {
+      window.alert('Escolha pelo menos um papel previsto para o convite.')
+      return
+    }
+    const message = await createInvite(String(form.get('email')), inviteRoles)
+    if (message) window.alert(message)
+    else formElement.reset()
+  }
+
+  async function revoke(inviteId: string) {
+    const invite = invites.find((item) => item.id === inviteId)
+    if (!invite) return
+    const message = await revokeInvite(invite)
+    if (message) window.alert(message)
+  }
+
   async function reject(user: User) {
     if (user.id === currentUser?.id) return
     const message = await rejectAccess(user)
@@ -145,6 +167,10 @@ export function UsersPage() {
       <PageHeader eyebrow="Administração" title="Usuários e acessos" description="Aprove cadastros e combine papéis em um único login." />
       <div className="security-rule"><ShieldCheck size={22} /><div><strong>Regra de governança ativa</strong><p>Uma conta só pode ser vinculada a uma pessoa. Ninguém altera o próprio acesso ou desativa a si mesmo.</p></div></div>
       <section className="panel pending-users"><div className="panel-header"><div><h2>Solicitações de cadastro</h2><p>Confira a identidade, vincule a pessoa e defina os acessos antes de aprovar.</p></div><StatusBadge tone={pending.length ? 'warning' : 'neutral'}>{pending.length} pendente{pending.length === 1 ? '' : 's'}</StatusBadge></div>{pending.length ? <div className="approval-list">{pending.map((user) => <article key={user.id}><span className="avatar">{user.photo ? <img src={user.photo} alt="" /> : user.name.charAt(0)}</span><div className="approval-info"><strong>{user.name}</strong><p>{user.email}</p><div className={`verification-status ${user.emailVerified ? 'verified' : 'unverified'}`}>{user.emailVerified ? <MailCheck size={15} /> : <MailWarning size={15} />}{user.emailVerified ? 'E-mail verificado' : 'Aguardando verificação do e-mail'}</div><div className="role-tags">{user.requestedRoles?.map((role) => <span key={role}>{ROLE_LABELS[role]}</span>)}</div><small>Solicitado em {displayDateTime(user.createdAt)}</small></div><div className="approval-actions"><button className="button primary small" disabled={!user.emailVerified} title={!user.emailVerified ? 'O usuário precisa confirmar o e-mail primeiro' : undefined} onClick={() => openAccess(user)}><Check size={17} /> Revisar e aprovar</button><button className="button secondary small" onClick={() => reject(user)}><X size={17} /> Recusar</button></div></article>)}</div> : <EmptyState title="Nenhum cadastro pendente" description="Novas solicitações aparecerão aqui." />}</section>
+      <section className="panel"><div className="panel-header"><div><h2>Convites de cadastro</h2><p>Somente quem foi convidado consegue criar uma conta. O convite vale por 14 dias e ainda passa pela sua aprovação.</p></div><StatusBadge tone={openInvites.length ? 'warning' : 'neutral'}>{openInvites.length} aberto{openInvites.length === 1 ? '' : 's'}</StatusBadge></div>
+        <form onSubmit={submitInvite}><div className="form-grid two-columns"><label className="field"><span>E-mail da pessoa convidada *</span><input name="email" type="email" required maxLength={160} autoComplete="off" /></label></div><fieldset className="role-picker"><legend>Papéis previstos</legend><div className="checkbox-grid">{roles.map((role) => <label key={role}><input type="checkbox" name="roles" value={role} /><span>{ROLE_LABELS[role]}</span></label>)}</div></fieldset><button className="button primary small" type="submit"><MailPlus size={17} /> Criar convite</button></form>
+        {openInvites.length > 0 && <div className="approval-list">{openInvites.map((invite) => <article key={invite.id}><div className="approval-info"><strong>{invite.email}</strong><div className="role-tags">{invite.roles.map((role) => <span key={role}>{ROLE_LABELS[role]}</span>)}</div><small>Criado por {invite.createdByName} · vence em {displayDateTime(invite.expiresAt)}</small></div><div className="approval-actions"><button className="button secondary small" type="button" onClick={() => revoke(invite.id)}><X size={17} /> Revogar</button></div></article>)}</div>}
+      </section>
       <section className="panel table-panel"><div className="panel-header"><div><h2>Usuários cadastrados</h2><p>Cada login fica ligado a um único cadastro de pessoa.</p></div></div><div className="responsive-table"><table><thead><tr><th>Usuário</th><th>Papéis de acesso</th><th>Pessoa vinculada</th><th>Status</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{active.map((user) => {
         const person = data.people.find((item) => item.id === user.personId)
         return <tr key={user.id}><td data-label="Usuário"><div className="user-cell"><span className="avatar small-avatar">{user.photo ? <img src={user.photo} alt="" /> : user.name.charAt(0)}</span><div><strong>{user.name}</strong><small>{user.email}</small></div></div></td><td data-label="Papéis"><div className="role-tags">{user.roles.map((role) => <span key={role}>{ROLE_LABELS[role]}</span>)}</div></td><td data-label="Pessoa vinculada">{person ? <strong>{person.name}</strong> : <StatusBadge tone="warning">Não vinculado</StatusBadge>}</td><td data-label="Status"><StatusBadge tone={user.status === 'ativo' ? 'success' : 'neutral'}>{user.status}</StatusBadge></td><td className="row-actions"><button className="icon-button" title="Vincular cadastro da pessoa" aria-label={`Vincular cadastro de ${user.name}`} onClick={() => openLink(user)}><Link2 size={18} /></button><button className="icon-button" disabled={user.id === currentUser?.id} title={user.id === currentUser?.id ? 'Você não pode alterar o próprio acesso' : 'Editar acesso'} onClick={() => openAccess(user)}><Pencil size={18} /></button><button className="icon-button" disabled={user.id === currentUser?.id} title={user.id === currentUser?.id ? 'Você não pode desativar a si mesmo' : user.status === 'ativo' ? 'Desativar' : 'Reativar'} onClick={() => toggleUser(user)}>{user.status === 'ativo' ? <UserX size={18} /> : <UserCheck size={18} />}</button></td></tr>

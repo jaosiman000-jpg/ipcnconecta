@@ -1,7 +1,7 @@
 import { AdminSetupError, getAdminServices } from './_lib/firebaseAdmin.js'
 import { executeMutation } from './_lib/mutationHandlers.js'
 import { consumeRateLimit, mutationActorLimit, mutationIpLimit } from './_lib/rateLimit.js'
-import { ApiError, assertSameOrigin, authenticate, json, parseMutation, readBearerToken } from './_lib/security.js'
+import { ApiError, assertSameOrigin, authenticate, errorCode, json, parseMutation, readBearerToken } from './_lib/security.js'
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID()
@@ -24,6 +24,7 @@ export async function POST(request: Request) {
       requestId,
       code: known ? error.code : setup ? error.reason : 'internal_error',
       errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorCode: known ? undefined : errorCode(error),
     }))
     return json({
       ok: false,

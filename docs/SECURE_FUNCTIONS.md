@@ -28,7 +28,7 @@ As APIs Security Token Service e IAM Service Account Credentials estão habilita
 A conta de serviço da Function recebe somente:
 
 - `roles/datastore.user`, para ler e gravar o Firestore;
-- `roles/firebaseauth.viewer`, para consultar a situação e a verificação do usuário no Firebase Authentication.
+- `roles/firebaseauth.admin`, para consultar usuários e, no cadastro por convite, criar (e desfazer a criação de) contas no Firebase Authentication.
 
 Não crie chaves para essa conta de serviço. O único principal autorizado a representá-la deve ser o subject OIDC da produção:
 

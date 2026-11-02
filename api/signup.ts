@@ -1,6 +1,6 @@
 import { AdminSetupError, getAdminServices } from './_lib/firebaseAdmin.js'
 import { signupSchema } from './_lib/schemas.js'
-import { ApiError, assertSameOrigin, json, parseJson } from './_lib/security.js'
+import { ApiError, assertSameOrigin, errorCode, json, parseJson } from './_lib/security.js'
 import { registerInvitedUser } from './_lib/signup.js'
 
 export async function POST(request: Request) {
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       requestId,
       code: known ? error.code : setup ? error.reason : 'internal_error',
       errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorCode: known ? undefined : errorCode(error),
     }))
     return json({
       ok: false,

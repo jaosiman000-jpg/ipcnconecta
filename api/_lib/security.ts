@@ -120,3 +120,8 @@ export function requireRole(actor: Actor, roles: Role[]) {
 export function isSuperuser(actor: Actor) {
   return hasAnyRole(actor, ['administrador', 'conselho'])
 }
+
+/** Código técnico do erro (ex.: `auth/insufficient-permission`), sem mensagem nem dados pessoais. */
+export function errorCode(error: unknown) {
+  return typeof error === 'object' && error && 'code' in error ? String(error.code).slice(0, 80) : undefined
+}

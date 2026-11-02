@@ -40,7 +40,7 @@ flowchart LR
 - `ebdClasses` e `attendance`: classes e chamadas da EBD.
 - `societies` e `societyRequests`: sociedades e pedidos de inclusão.
 - `ebdDirectory`: diretório mínimo dos alunos, consultado por professores somente nas classes atribuídas.
-- `financeDirectory`: diretório mínimo de contribuintes disponível para a Junta Diaconal.
+- `financeDirectory`: diretório mínimo de contribuintes disponível para o Diácono.
 - `financeBatches`: rascunhos e metadados dos lotes de contribuições.
 - `financeEntries`: contribuições finalizadas e cancelamentos preservados no histórico.
 - `invites`: convites de cadastro (e-mail, papéis previstos, validade de 14 dias, situação).
@@ -52,9 +52,9 @@ flowchart LR
 
 ## Autorização
 
-Conselho e Secretaria têm acesso completo e equivalente (o papel antigo Administrador é tratado do mesmo modo até ser convertido). Diácono, Professor e Acolhimento recebem apenas os módulos necessários; o papel Líder de sociedade está em espera. Papéis são cumulativos. Classes também possuem escopo próprio.
+Conselho e Secretaria têm acesso completo e equivalente. Diácono, Professor e Acolhimento recebem apenas os módulos necessários; o papel Líder de sociedade está em espera. Papéis são cumulativos. Classes também possuem escopo próprio.
 
-Na aprovação de uma conta, Administrador ou Conselho deve selecionar uma pessoa já cadastrada. O backend impede que duas contas usem a mesma pessoa e registra toda criação ou correção de vínculo na auditoria.
+Na aprovação de uma conta, Conselho ou Secretaria deve selecionar uma pessoa já cadastrada. O backend impede que duas contas usem a mesma pessoa e registra toda criação ou correção de vínculo na auditoria.
 
 ## CI/CD
 

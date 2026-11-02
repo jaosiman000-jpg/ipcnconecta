@@ -89,7 +89,7 @@ export function LoginPage() {
 
   if (authUser && profile?.status !== 'ativo') {
     const rejected = profile?.status === 'desativado'
-    return <AccessState icon={<ShieldCheck size={42} />} title={rejected ? 'Acesso não liberado' : 'Cadastro em análise'} description={rejected ? 'Este cadastro está desativado. Procure um Administrador ou membro do Conselho.' : 'Seu e-mail foi confirmado. Agora um Administrador ou membro do Conselho precisa revisar suas funções e liberar o acesso.'} actions={<button className="button secondary" onClick={logout}>Sair</button>} />
+    return <AccessState icon={<ShieldCheck size={42} />} title={rejected ? 'Acesso não liberado' : 'Cadastro em análise'} description={rejected ? 'Este cadastro está desativado. Procure o Conselho ou a Secretaria.' : 'Seu e-mail foi confirmado. Agora o Conselho ou a Secretaria precisa revisar suas funções e liberar o acesso.'} actions={<button className="button secondary" onClick={logout}>Sair</button>} />
   }
 
   return (

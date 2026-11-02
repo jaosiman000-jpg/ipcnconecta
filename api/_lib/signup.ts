@@ -8,7 +8,6 @@ import { ApiError } from './security.js'
 export const PRIVACY_NOTICE_VERSION = '2026-10-26'
 
 const ROLE_LABELS: Record<Role, string> = {
-  administrador: 'Administrador (antigo)',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
   diacono: 'Diácono',

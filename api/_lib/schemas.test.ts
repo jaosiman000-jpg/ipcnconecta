@@ -19,7 +19,7 @@ describe('contrato das mutações seguras', () => {
   })
 
   it('recusa campos extras no corpo da requisição', () => {
-    const parsed = mutationSchema.safeParse({ type: 'visitor.contact', visitorId: 'visitor-1', role: 'administrador' })
+    const parsed = mutationSchema.safeParse({ type: 'visitor.contact', visitorId: 'visitor-1', role: 'conselho' })
     expect(parsed.success).toBe(false)
   })
 
@@ -57,7 +57,7 @@ describe('contrato das mutações seguras', () => {
 
   it('exige pessoa na aprovação e valida o vínculo direto', () => {
     const missingPerson = mutationSchema.safeParse({
-      type: 'user.access.save', userId: 'user-1', roles: ['administrador'], classIds: [], societyIds: [],
+      type: 'user.access.save', userId: 'user-1', roles: ['conselho'], classIds: [], societyIds: [],
     })
     const validLink = mutationSchema.safeParse({ type: 'user.person.link', userId: 'user-1', personId: 'person-1' })
 
@@ -107,7 +107,7 @@ describe('contrato das mutações seguras', () => {
     const accessInjection = mutationSchema.safeParse({
       type: 'user.profile.update',
       name: 'Pessoa Teste',
-      roles: ['administrador'],
+      roles: ['conselho'],
     })
 
     expect(valid.success).toBe(true)

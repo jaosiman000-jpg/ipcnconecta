@@ -4,10 +4,10 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 
 ## Fluxo de acesso
 
-1. Administrador ou Conselho convida o e-mail da pessoa, com os papéis previstos. O convite vale por 14 dias e só pode ser usado uma vez.
+1. Conselho ou Secretaria convida o e-mail da pessoa, com os papéis previstos. O convite vale por 14 dias e só pode ser usado uma vez.
 2. A pessoa convidada cria a conta (nome, foto e senha individual) em `POST /api/signup`; o servidor cria o login e o perfil pendente. O navegador não escreve mais em `users`. O Firebase envia a verificação do e-mail.
 3. A conta permanece pendente e só consegue ler o próprio perfil.
-4. Administrador ou Conselho revisa a identidade, os papéis, as classes e as sociedades.
+4. Conselho ou Secretaria revisa a identidade, os papéis, as classes e as sociedades.
 5. A aprovação ativa o perfil e gera um evento de auditoria.
 6. Papéis e escopos são cumulativos no mesmo login.
 7. Ninguém pode aprovar a própria conta, alterar os próprios papéis ou desativar a si mesmo.

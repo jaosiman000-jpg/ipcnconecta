@@ -54,8 +54,8 @@ describe('cadastro de pessoas e diretórios', () => {
     expect((await db.collection('memberDirectory').doc('person-1').get()).exists).toBe(true)
   })
 
-  it('o papel antigo Administrador continua com acesso completo', async () => {
-    await run({ type: 'person.save', person: person() }, actorFor(['administrador'], { id: 'admin-legado' }))
+  it('o papel extinto Administrador não dá mais acesso', async () => {
+    await expectApiError(run({ type: 'person.save', person: person() }, actorFor(['administrador' as never], { id: 'admin-legado' })), 'permission_denied', 403)
   })
 
   it('secretaria cadastra dizimista e o diretório financeiro recebe só o necessário', async () => {
@@ -138,7 +138,7 @@ describe('convites de cadastro', () => {
     }
   })
 
-  it('não oferece os papéis Administrador (antigo) nem Líder de sociedade em convites', () => {
+  it('não oferece os papéis Administrador (extinto) nem Líder de sociedade em convites', () => {
     expect(mutationSchema.safeParse({ type: 'invite.create', email: 'a@example.com', roles: ['administrador'] }).success).toBe(false)
     expect(mutationSchema.safeParse({ type: 'invite.create', email: 'a@example.com', roles: ['lider'] }).success).toBe(false)
     expect(mutationSchema.safeParse({ type: 'invite.create', email: 'a@example.com', roles: ['diacono', 'acolhimento'] }).success).toBe(true)

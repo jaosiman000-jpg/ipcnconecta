@@ -97,7 +97,7 @@ export function UsersPage() {
     const wouldRemoveSuperuser = isSuperuser(editing) && !selectedRoles.some((role) => FULL_ACCESS_ROLES.includes(role))
     const otherSuperusers = accountUsers.filter((user) => user.id !== editing.id && user.status === 'ativo' && isSuperuser(user)).length
     if (wouldRemoveSuperuser && otherSuperusers === 0) {
-      window.alert('O sistema precisa manter pelo menos um Administrador ou membro do Conselho ativo.')
+      window.alert('O sistema precisa manter pelo menos um membro do Conselho ou da Secretaria ativo.')
       return
     }
     const message = await saveRemoteAccess(editing, {
@@ -154,7 +154,7 @@ export function UsersPage() {
     if (user.status === 'ativo' && isSuperuser(user)) {
       const otherSuperusers = accountUsers.filter((item) => item.id !== user.id && item.status === 'ativo' && isSuperuser(item)).length
       if (!otherSuperusers) {
-        window.alert('Não é possível desativar o último Administrador ou membro do Conselho ativo.')
+        window.alert('Não é possível desativar o último membro do Conselho ou da Secretaria ativo.')
         return
       }
     }
@@ -177,7 +177,7 @@ export function UsersPage() {
       })}</tbody></table></div></section>
 
       <Modal title={editing?.status === 'pendente' ? 'Revisar solicitação' : 'Editar acesso'} description="Vincule a pessoa e defina os papéis que serão somados neste login." open={Boolean(editing)} onClose={() => setEditing(null)} wide>
-        {editing && <form key={editing.id} onSubmit={saveAccess}><div className="review-person"><span className="avatar">{editing.photo ? <img src={editing.photo} alt="" /> : editing.name.charAt(0)}</span><div><strong>{editing.name}</strong><p>{editing.email}</p></div></div><PersonLinkPicker people={data.people} users={accountUsers} user={editing} selectedId={selectedPersonId} search={personSearch} onSearch={setPersonSearch} onSelect={selectPerson} /><fieldset className="role-picker"><legend>Quais atuações este usuário exerce?</legend><div className="checkbox-grid">{roles.map((role) => <label key={role}><input type="checkbox" name="roles" value={role} defaultChecked={editing.roles.includes(role) || (role === 'conselho' && editing.roles.includes('administrador')) || editing.requestedRoles?.includes(role)} /><span>{ROLE_LABELS[role]}</span></label>)}</div></fieldset><div className="assignment-grid"><fieldset><legend>Classes permitidas (para professores)</legend><div className="selection-list compact">{data.classes.map((item) => <label key={item.id}><input type="checkbox" name="classIds" value={item.id} defaultChecked={editing.classIds.includes(item.id)} /><span>{item.name}</span></label>)}</div></fieldset></div><FormActions onCancel={() => setEditing(null)} submitLabel={editing.status === 'pendente' ? 'Aprovar acesso' : 'Salvar permissões'} /></form>}
+        {editing && <form key={editing.id} onSubmit={saveAccess}><div className="review-person"><span className="avatar">{editing.photo ? <img src={editing.photo} alt="" /> : editing.name.charAt(0)}</span><div><strong>{editing.name}</strong><p>{editing.email}</p></div></div><PersonLinkPicker people={data.people} users={accountUsers} user={editing} selectedId={selectedPersonId} search={personSearch} onSearch={setPersonSearch} onSelect={selectPerson} /><fieldset className="role-picker"><legend>Quais atuações este usuário exerce?</legend><div className="checkbox-grid">{roles.map((role) => <label key={role}><input type="checkbox" name="roles" value={role} defaultChecked={editing.roles.includes(role) || editing.requestedRoles?.includes(role)} /><span>{ROLE_LABELS[role]}</span></label>)}</div></fieldset><div className="assignment-grid"><fieldset><legend>Classes permitidas (para professores)</legend><div className="selection-list compact">{data.classes.map((item) => <label key={item.id}><input type="checkbox" name="classIds" value={item.id} defaultChecked={editing.classIds.includes(item.id)} /><span>{item.name}</span></label>)}</div></fieldset></div><FormActions onCancel={() => setEditing(null)} submitLabel={editing.status === 'pendente' ? 'Aprovar acesso' : 'Salvar permissões'} /></form>}
       </Modal>
 
       <Modal title="Vincular cadastro da pessoa" description="Este vínculo identifica qual pessoa cadastrada é a dona desta conta." open={Boolean(linking)} onClose={() => setLinking(null)}>

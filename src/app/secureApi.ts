@@ -24,7 +24,6 @@ export type SecureMutation =
   | { type: 'invite.create'; email: string; roles: Role[] }
   | { type: 'invite.revoke'; inviteId: string }
   | { type: 'directories.rebuild' }
-  | { type: 'admins.migrate' }
 
 interface ApiResponse {
   ok: boolean

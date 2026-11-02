@@ -28,7 +28,7 @@ describe('proteções HTTP e autorização', () => {
   })
 
   it('recusa um papel sem permissão', () => {
-    expect(() => requireRole(actor, ['administrador', 'conselho'])).toThrowError(ApiError)
+    expect(() => requireRole(actor, ['conselho', 'secretaria'])).toThrowError(ApiError)
   })
 
   it('recusa requisição sem token antes de acessar serviços externos', () => {

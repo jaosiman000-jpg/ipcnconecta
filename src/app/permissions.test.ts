@@ -18,11 +18,6 @@ describe('permissões cumulativas', () => {
     }
   })
 
-  it('mantém o papel antigo Administrador com acesso total até a migração', () => {
-    expect(isSuperuser(user(['administrador']))).toBe(true)
-    expect(hasCapability(user(['administrador']), 'users.manage')).toBe(true)
-  })
-
   it('o Diácono só lança e consulta o financeiro, sem cancelar nem relatórios', () => {
     const diacono = user(['diacono'])
     expect(hasCapability(diacono, 'finance.view')).toBe(true)
@@ -61,9 +56,9 @@ describe('permissões cumulativas', () => {
   })
 
   it('todos consultam o próprio perfil; só o acesso completo altera configurações gerais', () => {
-    const roles: User['roles'] = ['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
+    const roles: User['roles'] = ['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
     roles.forEach((role) => expect(hasCapability(user([role]), 'settings.view')).toBe(true))
-    roles.slice(3).forEach((role) => expect(hasCapability(user([role]), 'settings.manage')).toBe(false))
+    roles.slice(2).forEach((role) => expect(hasCapability(user([role]), 'settings.manage')).toBe(false))
     expect(hasCapability(user(['secretaria']), 'settings.manage')).toBe(true)
   })
 
@@ -81,7 +76,7 @@ describe('navegação e nomes', () => {
     expect(homePath(user(['professor']))).toBe('/ebd')
   })
 
-  it('o Líder de sociedade e o Administrador antigo não são oferecidos para novos convites', () => {
+  it('o Líder de sociedade não são oferecidos para novos convites', () => {
     expect(ASSIGNABLE_ROLES).toEqual(['conselho', 'secretaria', 'diacono', 'professor', 'acolhimento'])
   })
 

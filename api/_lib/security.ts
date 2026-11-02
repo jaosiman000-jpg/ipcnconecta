@@ -23,7 +23,7 @@ export interface Actor {
   societyIds: string[]
 }
 
-const validRoles = new Set<Role>(['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento'])
+const validRoles = new Set<Role>(['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento'])
 
 export function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return Response.json(data, {
@@ -117,8 +117,8 @@ export function requireRole(actor: Actor, roles: Role[]) {
   if (!hasAnyRole(actor, roles)) throw new ApiError(403, 'permission_denied', 'Você não tem permissão para realizar esta ação.')
 }
 
-/** Conselho e Secretaria têm acesso completo; `administrador` é um papel antigo mantido até a migração. */
-export const FULL_ACCESS_ROLES: Role[] = ['administrador', 'conselho', 'secretaria']
+/** Conselho e Secretaria têm acesso completo e equivalente. */
+export const FULL_ACCESS_ROLES: Role[] = ['conselho', 'secretaria']
 
 export function isSuperuser(actor: Actor) {
   return hasAnyRole(actor, FULL_ACCESS_ROLES)

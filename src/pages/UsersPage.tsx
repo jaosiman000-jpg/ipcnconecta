@@ -3,11 +3,11 @@ import { Check, Link2, MailCheck, MailPlus, MailWarning, Pencil, ShieldCheck, Us
 import { useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
 import { displayDateTime } from '../app/format'
-import { isSuperuser, ROLE_LABELS, roleSummary } from '../app/permissions'
+import { ASSIGNABLE_ROLES, FULL_ACCESS_ROLES, isSuperuser, ROLE_LABELS, roleSummary } from '../app/permissions'
 import type { Person, Role, User } from '../app/types'
 import { EmptyState, FormActions, Modal, PageHeader, SearchField, StatusBadge } from '../components/Common'
 
-const roles: Role[] = ['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']
+const roles: Role[] = ASSIGNABLE_ROLES
 
 function normalized(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
@@ -94,7 +94,7 @@ export function UsersPage() {
       window.alert('Escolha pelo menos um papel de acesso.')
       return
     }
-    const wouldRemoveSuperuser = isSuperuser(editing) && !selectedRoles.some((role) => role === 'administrador' || role === 'conselho')
+    const wouldRemoveSuperuser = isSuperuser(editing) && !selectedRoles.some((role) => FULL_ACCESS_ROLES.includes(role))
     const otherSuperusers = accountUsers.filter((user) => user.id !== editing.id && user.status === 'ativo' && isSuperuser(user)).length
     if (wouldRemoveSuperuser && otherSuperusers === 0) {
       window.alert('O sistema precisa manter pelo menos um Administrador ou membro do Conselho ativo.')
@@ -177,7 +177,7 @@ export function UsersPage() {
       })}</tbody></table></div></section>
 
       <Modal title={editing?.status === 'pendente' ? 'Revisar solicitação' : 'Editar acesso'} description="Vincule a pessoa e defina os papéis que serão somados neste login." open={Boolean(editing)} onClose={() => setEditing(null)} wide>
-        {editing && <form key={editing.id} onSubmit={saveAccess}><div className="review-person"><span className="avatar">{editing.photo ? <img src={editing.photo} alt="" /> : editing.name.charAt(0)}</span><div><strong>{editing.name}</strong><p>{editing.email}</p></div></div><PersonLinkPicker people={data.people} users={accountUsers} user={editing} selectedId={selectedPersonId} search={personSearch} onSearch={setPersonSearch} onSelect={selectPerson} /><fieldset className="role-picker"><legend>Quais atuações este usuário exerce?</legend><div className="checkbox-grid">{roles.map((role) => <label key={role}><input type="checkbox" name="roles" value={role} defaultChecked={editing.roles.includes(role) || editing.requestedRoles?.includes(role)} /><span>{ROLE_LABELS[role]}</span></label>)}</div></fieldset><div className="assignment-grid"><fieldset><legend>Classes permitidas</legend><div className="selection-list compact">{data.classes.map((item) => <label key={item.id}><input type="checkbox" name="classIds" value={item.id} defaultChecked={editing.classIds.includes(item.id)} /><span>{item.name}</span></label>)}</div></fieldset><fieldset><legend>Sociedades permitidas</legend><div className="selection-list compact">{data.societies.map((item) => <label key={item.id}><input type="checkbox" name="societyIds" value={item.id} defaultChecked={editing.societyIds.includes(item.id)} /><span>{item.code} — {item.name}</span></label>)}</div></fieldset></div><FormActions onCancel={() => setEditing(null)} submitLabel={editing.status === 'pendente' ? 'Aprovar acesso' : 'Salvar permissões'} /></form>}
+        {editing && <form key={editing.id} onSubmit={saveAccess}><div className="review-person"><span className="avatar">{editing.photo ? <img src={editing.photo} alt="" /> : editing.name.charAt(0)}</span><div><strong>{editing.name}</strong><p>{editing.email}</p></div></div><PersonLinkPicker people={data.people} users={accountUsers} user={editing} selectedId={selectedPersonId} search={personSearch} onSearch={setPersonSearch} onSelect={selectPerson} /><fieldset className="role-picker"><legend>Quais atuações este usuário exerce?</legend><div className="checkbox-grid">{roles.map((role) => <label key={role}><input type="checkbox" name="roles" value={role} defaultChecked={editing.roles.includes(role) || (role === 'conselho' && editing.roles.includes('administrador')) || editing.requestedRoles?.includes(role)} /><span>{ROLE_LABELS[role]}</span></label>)}</div></fieldset><div className="assignment-grid"><fieldset><legend>Classes permitidas (para professores)</legend><div className="selection-list compact">{data.classes.map((item) => <label key={item.id}><input type="checkbox" name="classIds" value={item.id} defaultChecked={editing.classIds.includes(item.id)} /><span>{item.name}</span></label>)}</div></fieldset></div><FormActions onCancel={() => setEditing(null)} submitLabel={editing.status === 'pendente' ? 'Aprovar acesso' : 'Salvar permissões'} /></form>}
       </Modal>
 
       <Modal title="Vincular cadastro da pessoa" description="Este vínculo identifica qual pessoa cadastrada é a dona desta conta." open={Boolean(linking)} onClose={() => setLinking(null)}>

@@ -1,20 +1,20 @@
 import { Timestamp, type DocumentData, type DocumentReference, type Firestore, type WriteBatch } from 'firebase-admin/firestore'
 import type { AdminServices } from './firebaseAdmin.js'
-import { ApiError, errorCode, isSuperuser, requireRole, type Actor } from './security.js'
+import { ApiError, errorCode, FULL_ACCESS_ROLES, isSuperuser, requireRole, type Actor } from './security.js'
 import { INVITE_VALID_DAYS, inviteIdFor } from './invites.js'
 import type { MutationInput, Role } from './schemas.js'
 
-const SUPERUSER_ROLES: Role[] = ['administrador', 'conselho']
-const MEMBER_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES, 'secretaria']
-const VISITOR_ROLES: Role[] = [...MEMBER_MANAGER_ROLES, 'acolhimento']
+const SUPERUSER_ROLES: Role[] = FULL_ACCESS_ROLES
+const MEMBER_MANAGER_ROLES: Role[] = SUPERUSER_ROLES
+const VISITOR_ROLES: Role[] = [...SUPERUSER_ROLES, 'acolhimento']
 const EBD_MANAGER_ROLES: Role[] = [...MEMBER_MANAGER_ROLES]
 const SOCIETY_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES]
 const FINANCE_ROLES: Role[] = [...SUPERUSER_ROLES, 'diacono']
 const ROLE_LABELS: Record<Role, string> = {
-  administrador: 'Administrador',
+  administrador: 'Administrador (antigo)',
   conselho: 'Conselho',
   secretaria: 'Secretaria',
-  diacono: 'Junta Diaconal',
+  diacono: 'Diácono',
   professor: 'Professor',
   lider: 'Líder de sociedade',
   acolhimento: 'Acolhimento',
@@ -584,7 +584,7 @@ async function discardFinanceBatch(db: Firestore, actor: Actor, input: Extract<M
 }
 
 async function cancelFinanceEntry(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'finance.entry.cancel' }>) {
-  requireRole(actor, FINANCE_ROLES)
+  requireRole(actor, SUPERUSER_ROLES)
   const ref = db.collection('financeEntries').doc(input.entryId)
   const result = { action: 'financeiro.contribuicao_cancelada', detail: input.reason, targetId: input.entryId }
   await db.runTransaction(async (transaction) => {
@@ -634,7 +634,7 @@ async function saveUserAccess(db: Firestore, actor: Actor, input: Extract<Mutati
   requireRole(actor, SUPERUSER_ROLES)
   if (input.userId === actor.id) throw new ApiError(403, 'self_access_change', 'Você não pode alterar o próprio acesso.')
   const classIds = input.roles.includes('professor') ? input.classIds : []
-  const societyIds = input.roles.includes('lider') ? input.societyIds : []
+  const societyIds = (input.roles as Role[]).includes('lider') ? input.societyIds : []
   await assertReferencedAccess(db, classIds, societyIds)
   const authUser = await auth.getUser(input.userId)
   if (!authUser.emailVerified) throw new ApiError(409, 'target_email_unverified', 'O e-mail precisa estar verificado antes da aprovação.')
@@ -791,6 +791,23 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
   return result!
 }
 
+/** Converte contas com o papel antigo `administrador` para `conselho` (mesmo acesso). */
+async function migrateAdministrators(db: Firestore, actor: Actor) {
+  requireRole(actor, SUPERUSER_ROLES)
+  const users = await db.collection('users').get()
+  if (users.size > 400) throw new ApiError(409, 'user_limit', 'A atualização excede o limite seguro de usuários.')
+  const legacy = users.docs.filter((entry) => profileRoles(entry.data()).includes('administrador'))
+  const batch = db.batch()
+  legacy.forEach((entry) => {
+    const next = [...new Set(profileRoles(entry.data()).map((role) => (role === 'administrador' ? 'conselho' : role)))]
+    batch.update(entry.ref, { roles: next, office: next.map((role) => ROLE_LABELS[role as Role] ?? role).join(', '), updatedAt: Timestamp.now() })
+  })
+  const result = { action: 'usuarios.administradores_migrados', detail: `${legacy.length} conta(s) convertida(s) para Conselho`, targetId: 'roles' }
+  addAudit(batch, db, actor, result)
+  await batch.commit()
+  return result
+}
+
 async function authUserExists(auth: AdminServices['auth'], email: string) {
   try {
     await auth.getUserByEmail(email)
@@ -899,5 +916,6 @@ export async function executeMutation(input: MutationInput, actor: Actor, servic
     case 'invite.create': return createInvite(db, actor, input, auth)
     case 'invite.revoke': return revokeInvite(db, actor, input)
     case 'directories.rebuild': return rebuildDirectories(db, actor)
+    case 'admins.migrate': return migrateAdministrators(db, actor)
   }
 }

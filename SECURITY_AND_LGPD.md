@@ -27,11 +27,11 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 - Firestore regional em São Paulo, com proteção contra exclusão do banco.
 - Regras do Firestore negam tudo por padrão.
 - Dados administrativos separados em coleções com autorização por papel.
-- Cadastro completo de pessoas restrito a Administrador, Conselho e Secretaria; professores recebem apenas o diretório das próprias classes e a Junta Diaconal recebe apenas o diretório mínimo de dizimistas.
+- Cadastro completo de pessoas restrito ao acesso completo (Conselho e Secretaria); professores recebem apenas o diretório das próprias classes e o Diácono recebe o financeiro, sem acesso a cadastros de pessoas, membros ou visitantes.
 - Matrículas da EBD e números de membro são gerados em transações no servidor; valores enviados pelo navegador não definem nem alteram a sequência.
-- Dados pastorais e documentos de membros separados dos dados gerais e acessíveis somente por Administrador e Conselho.
-- Professores recebem somente as classes atribuídas; líderes recebem somente as sociedades atribuídas.
-- Financeiro acessível somente por Administrador, Conselho e Junta Diaconal.
+- Dados pastorais e documentos de membros separados dos dados gerais e acessíveis somente pelo acesso completo (Conselho e Secretaria).
+- Professores recebem somente as classes atribuídas. O módulo Sociedades está em espera: não aparece no menu e o diretório de membros só é lido pelo acesso completo.
+- Financeiro acessível pelo acesso completo e pelo Diácono. Somente o acesso completo cancela lançamentos (com justificativa) e acessa Relatórios.
 - Contribuições são finalizadas em lotes imutáveis; cancelamentos exigem justificativa, preservam o histórico e deixam de compor os totais.
 - Nove cenários de permissão validados pelo simulador oficial de regras do Firebase.
 - Conta pendente não lista usuários, não lê auditoria e não promove o próprio acesso.

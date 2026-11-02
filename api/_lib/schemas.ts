@@ -127,8 +127,11 @@ const contributionBatch = z.object({
   items: z.array(contributionItem).max(200).refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'Itens duplicados'),
 }).strict()
 
-const roles = z.array(z.enum(['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']))
-  .min(1).max(7).refine((items) => new Set(items).size === items.length, 'Papéis duplicados')
+const allRoles = z.enum(['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento'])
+
+// Papéis que podem ser concedidos hoje: `administrador` é legado e `lider` está em espera (Sociedades oculto).
+const roles = z.array(z.enum(['conselho', 'secretaria', 'diacono', 'professor', 'acolhimento']))
+  .min(1).max(5).refine((items) => new Set(items).size === items.length, 'Papéis duplicados')
 
 const profilePhoto = z.string()
   .max(140_000)
@@ -175,10 +178,11 @@ export const mutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('invite.create'), email: inviteEmail, roles }).strict(),
   z.object({ type: z.literal('invite.revoke'), inviteId: id }).strict(),
   z.object({ type: z.literal('directories.rebuild') }).strict(),
+  z.object({ type: z.literal('admins.migrate') }).strict(),
 ])
 
 export type MutationInput = z.infer<typeof mutationSchema>
-export type Role = z.infer<typeof roles>[number]
+export type Role = z.infer<typeof allRoles>
 
 export function safeDetail(value: unknown) {
   return shortText.parse(String(value ?? ''))

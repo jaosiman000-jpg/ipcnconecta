@@ -1,6 +1,6 @@
 import { Timestamp, type DocumentData, type DocumentReference, type Firestore, type WriteBatch } from 'firebase-admin/firestore'
 import type { AdminServices } from './firebaseAdmin.js'
-import { ApiError, isSuperuser, requireRole, type Actor } from './security.js'
+import { ApiError, errorCode, isSuperuser, requireRole, type Actor } from './security.js'
 import { INVITE_VALID_DAYS, inviteIdFor } from './invites.js'
 import type { MutationInput, Role } from './schemas.js'
 
@@ -729,7 +729,19 @@ async function linkUserPerson(db: Firestore, actor: Actor, input: Extract<Mutati
   return result!
 }
 
-async function rejectUserAccess(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'user.access.reject' }>) {
+/**
+ * Encerra as sessões do Firebase Auth de quem foi desativado. O acesso já é negado pelo perfil;
+ * se a revogação falhar, a desativação continua valendo e o erro fica no log.
+ */
+async function revokeSessions(auth: AdminServices['auth'], userId: string) {
+  try {
+    await auth.revokeRefreshTokens(userId)
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'revoke_sessions_failed', userId, errorCode: errorCode(error) }))
+  }
+}
+
+async function rejectUserAccess(db: Firestore, actor: Actor, input: Extract<MutationInput, { type: 'user.access.reject' }>, auth: AdminServices['auth']) {
   requireRole(actor, SUPERUSER_ROLES)
   if (input.userId === actor.id) throw new ApiError(403, 'self_access_change', 'Você não pode alterar o próprio acesso.')
   const ref = db.collection('users').doc(input.userId)
@@ -741,6 +753,7 @@ async function rejectUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
   const result = { action: 'usuario.pedido_recusado', detail: String(target.data()?.name ?? ''), targetId: input.userId }
   addAudit(batch, db, actor, result)
   await batch.commit()
+  await revokeSessions(auth, input.userId)
   return result
 }
 
@@ -749,6 +762,7 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
   if (input.userId === actor.id) throw new ApiError(403, 'self_access_change', 'Você não pode desativar a si mesmo.')
   const authUser = await auth.getUser(input.userId)
   let result: AuditResult | undefined
+  let deactivated = false
   await db.runTransaction(async (transaction) => {
     const [target, users] = await Promise.all([
       transaction.get(db.collection('users').doc(input.userId)),
@@ -764,6 +778,7 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
       if (!profileRoles(data).length) throw new ApiError(409, 'roles_missing', 'Defina pelo menos um papel antes de reativar.')
       if (!authUser.emailVerified) throw new ApiError(409, 'target_email_unverified', 'O e-mail precisa estar verificado antes da reativação.')
     }
+    deactivated = nextStatus === 'desativado'
     transaction.update(target.ref, { status: nextStatus, emailVerified: nextStatus === 'ativo' ? true : data.emailVerified, updatedAt: Timestamp.now() })
     result = {
       action: nextStatus === 'ativo' ? 'usuario.reativado' : 'usuario.desativado',
@@ -772,6 +787,7 @@ async function toggleUserAccess(db: Firestore, actor: Actor, input: Extract<Muta
     }
     transaction.set(db.collection('audit').doc(), { actorId: actor.id, ...result, at: Timestamp.now() })
   })
+  if (deactivated) await revokeSessions(auth, input.userId)
   return result!
 }
 
@@ -878,7 +894,7 @@ export async function executeMutation(input: MutationInput, actor: Actor, servic
     case 'user.profile.update': return updateOwnProfile(db, actor, input)
     case 'user.access.save': return saveUserAccess(db, actor, input, auth)
     case 'user.person.link': return linkUserPerson(db, actor, input)
-    case 'user.access.reject': return rejectUserAccess(db, actor, input)
+    case 'user.access.reject': return rejectUserAccess(db, actor, input, auth)
     case 'user.access.toggle': return toggleUserAccess(db, actor, input, auth)
     case 'invite.create': return createInvite(db, actor, input, auth)
     case 'invite.revoke': return revokeInvite(db, actor, input)

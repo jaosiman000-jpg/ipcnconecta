@@ -223,6 +223,29 @@ describe('aprovação e governança de acessos', () => {
     await expectApiError(run({ type: 'user.access.toggle', userId: 'su-1' }, actorFor(['conselho'], { id: 'su-2' })), 'last_superuser', 409)
   })
 
+  it('encerra as sessões de quem é desativado e não de quem é reativado', async () => {
+    await run(approve(), conselho)
+    await run({ type: 'user.access.toggle', userId: 'novo' }, conselho)
+    expect(fake.calls.revoked).toEqual(['novo'])
+
+    await run({ type: 'user.access.toggle', userId: 'novo' }, conselho)
+    expect(fake.calls.revoked).toEqual(['novo'])
+  })
+
+  it('a desativação vale mesmo que a revogação de sessões falhe', async () => {
+    await run(approve(), conselho)
+    fake.hooks.failRevoke = true
+    await run({ type: 'user.access.toggle', userId: 'novo' }, conselho)
+    expect((await db.collection('users').doc('novo').get()).data()?.status).toBe('desativado')
+    expect(fake.calls.revoked).toEqual([])
+  })
+
+  it('encerra as sessões de um pedido recusado', async () => {
+    await seedUser(db, 'outro', { status: 'pendente' })
+    await run({ type: 'user.access.reject', userId: 'outro' }, conselho)
+    expect(fake.calls.revoked).toEqual(['outro'])
+  })
+
   it('desativa e reativa contas, e recusa pedidos pendentes', async () => {
     await run(approve(), conselho)
     await run({ type: 'user.access.toggle', userId: 'novo' }, conselho)

@@ -100,7 +100,8 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
       }))
     }
   } else if (needsMemberDirectory) {
-    stops.push(subscribeQueries<Member>([fullCollection('memberDirectory')], (items) => { publicMembers = items; emitMembers() }))
+    // O diretório só contém membros ativos e não traz a situação; ela é preenchida aqui.
+    stops.push(subscribeQueries<Member>([fullCollection('memberDirectory')], (items) => { publicMembers = items.map((item) => ({ ...item, status: 'Ativo' as const })); emitMembers() }))
   } else receive({ members: [] })
 
   if (hasCapability(user, 'people.view')) {

@@ -23,7 +23,7 @@ flowchart LR
 - Firebase Authentication: criação de conta, login, verificação de e-mail e recuperação de senha.
 - Cloud Firestore: persistência e sincronização em tempo real.
 - Firestore Rules: autorização de leitura por papel e escopo e bloqueio das escritas administrativas do navegador.
-- Vercel Functions: `GET /api/health` para diagnóstico e `POST /api/mutations` para escritas autenticadas, autorizadas, validadas e auditadas.
+- Vercel Functions: `GET /api/health` para diagnóstico, `POST /api/signup` para cadastro por convite e `POST /api/mutations` para escritas autenticadas, autorizadas, validadas, auditadas e com limite de taxa.
 - Workload Identity Federation: entrega à Function acesso temporário de menor privilégio, sem chave privada armazenada na Vercel ou no Git.
 - Firebase Storage: documentos e comprovantes, ainda desativado até existir um bucket com regras publicadas.
 - Service Worker: cache exclusivo do shell estático; não intercepta `/api` nem serviços externos do Firebase.
@@ -34,7 +34,7 @@ flowchart LR
 - `people`: cadastro mestre; cada pessoa pode possuir vínculos independentes com membros, EBD e dízimos.
 - `users.personId` e `people.authUserId`: vínculo 1:1 entre a credencial de acesso e o cadastro mestre, validado em transação pelo backend.
 - `members`: projeção dos dados gerais das pessoas oficialmente recebidas como membros.
-- `memberDirectory`: diretório mínimo de membros para os fluxos das sociedades.
+- `memberDirectory`: diretório mínimo (nome e nascimento) dos membros ativos, para os fluxos das sociedades. Pode ser recriado a partir de `people` em Configurações.
 - `memberPrivate`: observações e documentos pastorais restritos.
 - `visitors`: cadastro e acompanhamento de visitantes.
 - `ebdClasses` e `attendance`: classes e chamadas da EBD.
@@ -43,6 +43,8 @@ flowchart LR
 - `financeDirectory`: diretório mínimo de contribuintes disponível para a Junta Diaconal.
 - `financeBatches`: rascunhos e metadados dos lotes de contribuições.
 - `financeEntries`: contribuições finalizadas e cancelamentos preservados no histórico.
+- `invites`: convites de cadastro (e-mail, papéis previstos, validade de 14 dias, situação).
+- `rateLimits`: contadores de limite de taxa com chaves em hash e expiração por TTL (`expiresAt`).
 - `audit`: histórico imutável de ações.
 - `appSettings/general`: configurações gerais.
 - `systemCounters/people`: próximas sequências de matrícula EBD e número de membro.
@@ -65,6 +67,6 @@ Na aprovação de uma conta, Administrador ou Conselho deve selecionar uma pesso
 
 Não há um servidor tradicional separado. Vercel Functions é o backend HTTP e escala sob demanda. Firebase continua como backend de autenticação, leituras em tempo real e arquivos.
 
-O navegador pode criar o próprio perfil pendente e sincronizar a confirmação do próprio e-mail. Todas as outras escritas passam por `POST /api/mutations`. A Function valida o token Firebase, recarrega o perfil no Firestore, confere papel e escopo, valida o contrato da operação e grava o evento de auditoria no mesmo lote ou transação.
+O navegador só pode sincronizar a confirmação do próprio e-mail. O perfil pendente é criado pelo servidor em `POST /api/signup`, e todas as outras escritas passam por `POST /api/mutations`. A Function valida o token Firebase, recarrega o perfil no Firestore, confere papel e escopo, valida o contrato da operação e grava o evento de auditoria no mesmo lote ou transação.
 
 O procedimento de provisionamento e a ordem segura de publicação estão em [SECURE_FUNCTIONS.md](SECURE_FUNCTIONS.md).

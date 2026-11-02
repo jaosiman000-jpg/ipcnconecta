@@ -41,6 +41,16 @@ export interface User {
   privacyNoticeAcceptedAt?: string
 }
 
+export interface Invite {
+  id: string
+  email: string
+  roles: Role[]
+  status: 'pendente' | 'usado' | 'revogado'
+  createdByName: string
+  createdAt: string
+  expiresAt: string
+}
+
 export interface MemberDocument {
   id: string
   name: string

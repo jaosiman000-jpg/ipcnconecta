@@ -1,5 +1,6 @@
 import type { Auth, DecodedIdToken } from 'firebase-admin/auth'
 import type { Firestore } from 'firebase-admin/firestore'
+import type { ZodType } from 'zod'
 import { mutationSchema, type MutationInput, type Role } from './schemas.js'
 
 export class ApiError extends Error {
@@ -7,6 +8,7 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     message: string,
+    public retryAfter?: number,
   ) {
     super(message)
   }
@@ -23,10 +25,11 @@ export interface Actor {
 
 const validRoles = new Set<Role>(['administrador', 'conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento'])
 
-export function json(data: unknown, status = 200) {
+export function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return Response.json(data, {
     status,
     headers: {
+      ...extraHeaders,
       'Cache-Control': 'no-store',
       'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
       'X-Content-Type-Options': 'nosniff',
@@ -34,10 +37,13 @@ export function json(data: unknown, status = 200) {
   })
 }
 
-export function assertSameOrigin(request: Request) {
+export function assertSameOrigin(request: Request, options: { requireOrigin?: boolean } = {}) {
   const origin = request.headers.get('origin')
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
-  if (!origin || !host) return
+  if (!origin || !host) {
+    if (options.requireOrigin) throw new ApiError(403, 'origin_required', 'Origem da requisição não permitida.')
+    return
+  }
   let originHost = ''
   try { originHost = new URL(origin).host } catch { throw new ApiError(403, 'origin_invalid', 'Origem da requisição inválida.') }
   if (originHost !== host) throw new ApiError(403, 'origin_denied', 'Origem da requisição não permitida.')
@@ -81,7 +87,7 @@ export async function authenticate(idToken: string, auth: Auth, db: Firestore): 
   }
 }
 
-export async function parseMutation(request: Request): Promise<MutationInput> {
+export async function parseJson<T>(request: Request, schema: ZodType<T>): Promise<T> {
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
     throw new ApiError(415, 'content_type_invalid', 'Formato da requisição inválido.')
   }
@@ -94,9 +100,13 @@ export async function parseMutation(request: Request): Promise<MutationInput> {
   }
   let body: unknown
   try { body = JSON.parse(text) } catch { throw new ApiError(400, 'json_invalid', 'Dados enviados em formato inválido.') }
-  const result = mutationSchema.safeParse(body)
+  const result = schema.safeParse(body)
   if (!result.success) throw new ApiError(400, 'payload_invalid', 'Revise os dados informados e tente novamente.')
   return result.data
+}
+
+export function parseMutation(request: Request): Promise<MutationInput> {
+  return parseJson(request, mutationSchema)
 }
 
 export function hasAnyRole(actor: Actor, roles: Role[]) {

@@ -21,6 +21,9 @@ export type SecureMutation =
   | { type: 'user.person.link'; userId: string; personId: string }
   | { type: 'user.access.reject'; userId: string }
   | { type: 'user.access.toggle'; userId: string }
+  | { type: 'invite.create'; email: string; roles: Role[] }
+  | { type: 'invite.revoke'; inviteId: string }
+  | { type: 'directories.rebuild' }
 
 interface ApiResponse {
   ok: boolean
@@ -50,5 +53,27 @@ export async function callSecureMutation(mutation: SecureMutation) {
   try { body = await response.json() as ApiResponse } catch { body = undefined }
   if (!response.ok || !body?.ok) {
     throw new Error(body?.message ?? 'Não foi possível concluir a operação. Tente novamente.')
+  }
+}
+
+export interface SignupPayload {
+  name: string
+  email: string
+  password: string
+  photo: string
+  privacyNotice: true
+}
+
+export async function registerWithInvite(payload: SignupPayload) {
+  const response = await fetch('/api/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    credentials: 'same-origin',
+  })
+  let body: ApiResponse | undefined
+  try { body = await response.json() as ApiResponse } catch { body = undefined }
+  if (!response.ok || !body?.ok) {
+    throw new Error(body?.message ?? 'Não foi possível concluir o cadastro. Tente novamente.')
   }
 }

@@ -4,9 +4,9 @@ O IPCN Conecta trata dados pessoais e informações pastorais. Toda alteração 
 
 ## Fluxo recomendado
 
-1. Crie uma branch a partir de `main`.
+1. Crie uma branch a partir de `main`. A `main` é protegida: não aceita push direto.
 2. Faça uma alteração pequena e bem delimitada.
-3. Execute `npm run check`.
+3. Execute `npm run check` (exige Java para o Firestore Emulator).
 4. Abra um pull request explicando o comportamento alterado e como ele foi testado.
 5. Aguarde a validação automática e o preview da Vercel antes da aprovação.
 
@@ -14,7 +14,8 @@ O IPCN Conecta trata dados pessoais e informações pastorais. Toda alteração 
 
 - Nunca envie `.env`, chaves de serviço, tokens, senhas ou exportações do Firebase.
 - Nunca use dados reais de membros, visitantes ou usuários em testes e screenshots.
-- Alterações de permissões devem atualizar e testar as regras do Firestore.
+- Alterações de permissões devem atualizar `firestore.rules` e os testes em `api/_lib/emulator/`.
+- Desenvolva contra o emulador (`npm run dev:emulator`), nunca contra o projeto de produção.
 - Dados pastorais restritos não podem ser movidos para coleções públicas ou caches locais.
 - O Service Worker só pode armazenar arquivos estáticos; respostas de `/api` e do Firebase ficam fora do cache.
 - Não altere produção diretamente pelo console sem registrar a mudança no repositório.

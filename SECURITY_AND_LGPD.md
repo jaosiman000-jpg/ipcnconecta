@@ -4,8 +4,8 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 
 ## Fluxo de acesso
 
-1. A pessoa cria uma conta com nome, e-mail, foto, atuação e senha individual.
-2. O Firebase envia a verificação do e-mail.
+1. Administrador ou Conselho convida o e-mail da pessoa, com os papéis previstos. O convite vale por 14 dias e só pode ser usado uma vez.
+2. A pessoa convidada cria a conta (nome, foto e senha individual) em `POST /api/signup`; o servidor cria o login e o perfil pendente. O navegador não escreve mais em `users`. O Firebase envia a verificação do e-mail.
 3. A conta permanece pendente e só consegue ler o próprio perfil.
 4. Administrador ou Conselho revisa a identidade, os papéis, as classes e as sociedades.
 5. A aprovação ativa o perfil e gera um evento de auditoria.
@@ -13,6 +13,12 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 7. Ninguém pode aprovar a própria conta, alterar os próprios papéis ou desativar a si mesmo.
 
 ## Controles já aplicados
+
+- Cadastro fechado: sem convite válido para o e-mail não existe conta. Tentativas inválidas também contam no limite.
+- Limite de tentativas por janela, gravado em `rateLimits` com IP e e-mail em hash (expiram por TTL): cadastro (por IP, por e-mail e global), operações da API (por IP e por usuário).
+- O diretório de membros lido por professores e líderes contém somente membros ativos, com nome e nascimento; situação, número e tipo ficam apenas no cadastro completo.
+- Backup do Firestore: recuperação pontual de 7 dias, backup diário (7 dias) e semanal (14 semanas).
+- Testes automatizados das regras do Firestore (por perfil e coleção) e das operações da API em um emulador local, executados no CI.
 
 - Firebase Authentication com senha individual e verificação de e-mail.
 - Sessão limitada à aba/sessão do navegador, adequada ao computador compartilhado.
@@ -48,6 +54,8 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 - Publicar o aviso de privacidade completo com identificação do controlador e contato responsável.
 - Definir processo de correção, exportação, anonimização e eliminação quando legalmente aplicável.
 - Definir resposta a incidentes e revisão periódica dos acessos.
-- Validar a federação OIDC em um deploy controlado antes de publicar as regras que bloqueiam escritas administrativas diretas do navegador.
+- Ativar, no Identity Platform, a opção que desabilita o cadastro direto pelo cliente do Firebase Auth (o cadastro já é impedido de gerar perfil, mas contas sem perfil ainda podem ser criadas na API pública).
+- Adicionar uma regra de rate limit no Vercel Firewall como camada extra antes da Function.
+- Definir e testar o procedimento de restauração a partir dos backups.
 
 Os módulos administrativos usam o Firestore em tempo real. Enquanto o Firebase Storage não for ativado, documentos e comprovantes não poderão ser enviados.

@@ -66,42 +66,6 @@ service cloud.firestore {
       return hasRole(['administrador', 'conselho', 'diacono']);
     }
 
-    function validRequestedRoles(roles) {
-      return roles is list
-        && roles.size() > 0
-        && roles.size() <= 6
-        && roles.hasOnly(['conselho', 'secretaria', 'diacono', 'professor', 'lider', 'acolhimento']);
-    }
-
-    function validStrings(values) {
-      return values is list && values.size() <= 100;
-    }
-
-    function validNewProfile(userId) {
-      let data = request.resource.data;
-      return request.auth.uid == userId
-        && data.keys().hasOnly([
-          'uid', 'name', 'email', 'photo', 'office', 'emailVerified', 'roles', 'requestedRoles',
-          'status', 'classIds', 'societyIds', 'createdAt', 'updatedAt',
-          'privacyNoticeVersion', 'privacyNoticeAcceptedAt'
-        ])
-        && data.uid == userId
-        && data.name is string && data.name.size() >= 3 && data.name.size() <= 120
-        && data.email == request.auth.token.email
-        && data.photo is string && data.photo.size() < 140000
-        && data.office is string && data.office.size() >= 2 && data.office.size() <= 100
-        && data.emailVerified == request.auth.token.email_verified
-        && data.roles is list && data.roles.size() == 0
-        && validRequestedRoles(data.requestedRoles)
-        && data.status == 'pendente'
-        && validStrings(data.classIds)
-        && validStrings(data.societyIds)
-        && data.createdAt == request.time
-        && data.updatedAt == request.time
-        && data.privacyNoticeVersion == '2026-10-26'
-        && data.privacyNoticeAcceptedAt == request.time;
-    }
-
     function validSelfVerification() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emailVerified', 'updatedAt'])
         && request.resource.data.emailVerified == request.auth.token.email_verified
@@ -111,7 +75,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if signedIn() && (request.auth.uid == userId || superuser());
       allow list: if superuser();
-      allow create: if signedIn() && validNewProfile(userId);
+      allow create: if false;
       allow update: if signedIn() && request.auth.uid == userId && validSelfVerification();
       allow delete: if false;
     }
@@ -179,6 +143,11 @@ service cloud.firestore {
 
     match /people/{personId} {
       allow read: if memberManager();
+      allow create, update, delete: if false;
+    }
+
+    match /invites/{inviteId} {
+      allow read: if superuser();
       allow create, update, delete: if false;
     }
 

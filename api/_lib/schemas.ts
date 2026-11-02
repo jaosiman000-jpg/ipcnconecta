@@ -134,6 +134,18 @@ const profilePhoto = z.string()
   .max(140_000)
   .regex(/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/)
 
+const inviteEmail = z.string().trim().toLowerCase().email().max(160)
+
+export const signupSchema = z.object({
+  name: z.string().trim().min(3).max(120),
+  email: inviteEmail,
+  password: z.string().min(8).max(72),
+  photo: profilePhoto,
+  privacyNotice: z.literal(true),
+}).strict()
+
+export type SignupInput = z.infer<typeof signupSchema>
+
 export const mutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('person.save'), person }).strict(),
   z.object({
@@ -160,6 +172,9 @@ export const mutationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('user.person.link'), userId: id, personId: id }).strict(),
   z.object({ type: z.literal('user.access.reject'), userId: id }).strict(),
   z.object({ type: z.literal('user.access.toggle'), userId: id }).strict(),
+  z.object({ type: z.literal('invite.create'), email: inviteEmail, roles }).strict(),
+  z.object({ type: z.literal('invite.revoke'), inviteId: id }).strict(),
+  z.object({ type: z.literal('directories.rebuild') }).strict(),
 ])
 
 export type MutationInput = z.infer<typeof mutationSchema>

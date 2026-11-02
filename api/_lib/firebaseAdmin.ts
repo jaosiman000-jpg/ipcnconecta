@@ -4,7 +4,7 @@ import { deleteApp, getApps, initializeApp, type App, type Credential } from 'fi
 import { getAuth, type Auth } from 'firebase-admin/auth'
 import { ExternalAccountClient } from 'google-auth-library'
 
-interface AdminServices {
+export interface AdminServices {
   app: App
   auth: Auth
   db: Firestore
@@ -65,7 +65,20 @@ function createCredential(token: string) {
   return { client, credential }
 }
 
+/** Desenvolvimento local contra o Firebase Emulator Suite; nunca vale em deployments da Vercel. */
+function emulatorMode() {
+  return Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST && !process.env.VERCEL_ENV)
+}
+
+function getEmulatorServices(): AdminServices {
+  const projectId = process.env.GCP_PROJECT_ID?.trim() || 'demo-ipcn'
+  const appName = 'ipcn-emulator'
+  const app = getApps().find((item) => item.name === appName) ?? initializeApp({ projectId }, appName)
+  return { app, auth: getAuth(app), db: new Firestore({ projectId }) }
+}
+
 export function getAdminServices(request: Request): AdminServices {
+  if (emulatorMode()) return getEmulatorServices()
   const token = oidcToken(request)
   const cacheKey = createHash('sha256').update(token).digest('hex')
   const cached = serviceCache.get(cacheKey)

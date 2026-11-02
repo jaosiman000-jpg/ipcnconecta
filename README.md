@@ -19,8 +19,8 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 ## Funcionalidades
 
 - Login real com Firebase Authentication, verificação de e-mail e recuperação de senha.
-- Solicitação de acesso com foto e atuações desejadas.
-- Aprovação por Administrador ou Conselho.
+- Cadastro somente por convite: o Conselho ou a Administração convida o e-mail, a pessoa cria a conta e a aprovação final continua manual.
+- Limite de tentativas no cadastro e nas operações da API.
 - Papéis cumulativos no mesmo login.
 - Cadastro unificado de pessoas com vínculos independentes de membro, EBD e dízimos.
 - Vinculação única entre a conta de login e o cadastro da pessoa, exigida durante a aprovação.
@@ -35,7 +35,7 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Sincronização em tempo real entre computadores e celulares.
 - PWA instalável com ícone da IPCN.
 - Escritas administrativas validadas por uma Vercel Function em `POST /api/mutations`.
-- Vercel Function de diagnóstico em `GET /api/health`.
+- Cadastro por convite em `POST /api/signup` e diagnóstico em `GET /api/health`.
 
 Uploads de documentos e comprovantes já possuem código e regras preparados, mas permanecem desabilitados até a ativação segura do Firebase Storage.
 
@@ -82,7 +82,7 @@ Requisitos:
 
 - Node.js 22, 23 ou 24.
 - npm.
-- Um projeto Firebase próprio para desenvolvimento.
+- Java 21 ou superior, necessário para o Firebase Emulator Suite (testes e desenvolvimento local).
 
 Instalação:
 
@@ -90,11 +90,26 @@ Instalação:
 git clone https://github.com/jaosiman000-jpg/ipcnconecta.git
 cd ipcnconecta
 npm install
+```
+
+**Desenvolvimento local isolado (recomendado).** Usa o Firebase Emulator Suite, sem tocar nos dados reais:
+
+```bash
+npm run emulators        # terminal 1: Auth e Firestore locais
+npm run seed:emulator    # terminal 2: cria conselho@example.com / senha-de-teste-123
+npm run dev:emulator     # terminal 2: app em http://localhost:5173
+```
+
+O frontend usa as regras reais de `firestore.rules`. Para testar também a API (`/api/*`) no emulador, rode `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 npm run dev:vercel`; o modo emulador é ignorado em qualquer deployment da Vercel.
+
+**Contra um projeto Firebase real.** Use um projeto de desenvolvimento, nunca o de produção:
+
+```bash
 cp .env.example .env.local
 npm run dev
 ```
 
-Preencha `.env.local` com a configuração pública do seu projeto Firebase:
+Preencha `.env.local` com a configuração pública do projeto Firebase de desenvolvimento:
 
 ```dotenv
 VITE_FIREBASE_API_KEY=
@@ -126,13 +141,15 @@ O provisionamento seguro da Function está documentado em [docs/SECURE_FUNCTIONS
 npm run check
 ```
 
-Esse comando executa testes, build de produção e validações do manifesto e da política de cache do PWA.
+Esse comando executa os testes unitários, os testes de regras e da API no Firestore Emulator (`npm run test:emulator`, exige Java), o build de produção e as validações do PWA.
 
 ## CI/CD
 
-- Pushes e pull requests para `main` executam o workflow de qualidade no GitHub Actions.
+- A branch `main` é protegida: só recebe código por pull request com o check `Qualidade` aprovado.
+- Pushes e pull requests executam o workflow de qualidade no GitHub Actions.
 - Branches e pull requests recebem um preview da Vercel quando a integração Git está ativa.
 - `main` é a branch de produção.
+- As regras (`firestore.rules`) e os índices (`firestore.indexes.json`) são publicados manualmente com a CLI do Firebase **depois** do deploy do código que depende deles.
 - Variáveis de ambiente são configuradas na Vercel; nenhum token de deploy fica no repositório.
 
 ## Estrutura principal
@@ -169,7 +186,7 @@ Veja também [CONTRIBUTING.md](CONTRIBUTING.md).
 - PWA e Service Worker seguro: implementados.
 - CI no GitHub e deploy contínuo na Vercel: implementados.
 - Firebase Storage: código e regras prontos, aguardando plano e bucket.
-- Backup semanal: ainda não implementado.
+- Backup: recuperação pontual de 7 dias, backup diário (retenção de 7 dias) e semanal aos domingos (retenção de 14 semanas) no Firestore.
 - Operações administrativas em Vercel Functions: publicadas em produção com identidade OIDC e sem chave privada permanente. Falta validar uma operação autenticada real antes de publicar as regras restritivas do Firestore.
 
 Este projeto ainda é um MVP e deve passar por revisão técnica e jurídica antes de armazenar grandes volumes de dados reais.

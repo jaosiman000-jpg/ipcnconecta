@@ -49,9 +49,13 @@ describe('cadastro de pessoas e diretórios', () => {
     expect((await db.collection('people').doc('person-2').get()).data()?.membership.memberNumber).toBe(2)
   })
 
-  it('secretaria não define nem altera o vínculo de membro', async () => {
-    await expectApiError(run({ type: 'person.save', person: person() }, secretaria), 'membership_permission_denied', 403)
-    expect((await db.collection('people').get()).empty).toBe(true)
+  it('Secretaria, que tem acesso completo, também define o vínculo de membro', async () => {
+    await run({ type: 'person.save', person: person() }, secretaria)
+    expect((await db.collection('memberDirectory').doc('person-1').get()).exists).toBe(true)
+  })
+
+  it('o papel antigo Administrador continua com acesso completo', async () => {
+    await run({ type: 'person.save', person: person() }, actorFor(['administrador'], { id: 'admin-legado' }))
   })
 
   it('secretaria cadastra dizimista e o diretório financeiro recebe só o necessário', async () => {
@@ -99,9 +103,12 @@ describe('reconstrução dos diretórios', () => {
     expect((await db.collection('audit').get()).docs.map((entry) => entry.data().action)).toContain('diretorios.reconstruidos')
   })
 
-  it('é restrita ao Conselho e à Administração', async () => {
-    await expectApiError(run({ type: 'directories.rebuild' }, secretaria), 'permission_denied', 403)
+  it('é restrita ao acesso completo', async () => {
+    await expectApiError(run({ type: 'directories.rebuild' }, actorFor(['diacono'])), 'permission_denied', 403)
     expect((await db.collection('memberDirectory').doc('orfao').get()).exists).toBe(true)
+
+    await run({ type: 'directories.rebuild' }, secretaria)
+    expect((await db.collection('memberDirectory').doc('orfao').get()).exists).toBe(false)
   })
 })
 
@@ -119,13 +126,22 @@ describe('convites de cadastro', () => {
   })
 
   it('a auditoria do convite não guarda o e-mail', async () => {
-    await run({ type: 'invite.create', email: 'segredo@example.com', roles: ['lider'] }, conselho)
+    await run({ type: 'invite.create', email: 'segredo@example.com', roles: ['professor'] }, conselho)
     const audit = (await db.collection('audit').get()).docs.map((entry) => JSON.stringify(entry.data())).join('')
     expect(audit).not.toContain('segredo@example.com')
   })
 
-  it('perfis sem poder administrativo não convidam', async () => {
-    await expectApiError(run({ type: 'invite.create', email: 'a@example.com', roles: ['professor'] }, secretaria), 'permission_denied', 403)
+  it('Secretaria convida como o Conselho; os demais perfis não', async () => {
+    await run({ type: 'invite.create', email: 'a@example.com', roles: ['professor'] }, secretaria)
+    for (const role of ['diacono', 'professor', 'acolhimento'] as const) {
+      await expectApiError(run({ type: 'invite.create', email: 'b@example.com', roles: ['professor'] }, actorFor([role])), 'permission_denied', 403)
+    }
+  })
+
+  it('não oferece os papéis Administrador (antigo) nem Líder de sociedade em convites', () => {
+    expect(mutationSchema.safeParse({ type: 'invite.create', email: 'a@example.com', roles: ['administrador'] }).success).toBe(false)
+    expect(mutationSchema.safeParse({ type: 'invite.create', email: 'a@example.com', roles: ['lider'] }).success).toBe(false)
+    expect(mutationSchema.safeParse({ type: 'invite.create', email: 'a@example.com', roles: ['diacono', 'acolhimento'] }).success).toBe(true)
   })
 
   it('não convida quem já possui conta', async () => {
@@ -141,7 +157,7 @@ describe('convites de cadastro', () => {
     expect((await db.collection('invites').doc(id).get()).data()?.status).toBe('revogado')
     await expectApiError(run({ type: 'invite.revoke', inviteId: id }, conselho), 'invite_not_pending', 409)
     await expectApiError(run({ type: 'invite.revoke', inviteId: 'inexistente' }, conselho), 'invite_not_found', 404)
-    await expectApiError(run({ type: 'invite.revoke', inviteId: id }, secretaria), 'permission_denied', 403)
+    await expectApiError(run({ type: 'invite.revoke', inviteId: id }, actorFor(['diacono'])), 'permission_denied', 403)
   })
 })
 

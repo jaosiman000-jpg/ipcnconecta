@@ -41,15 +41,16 @@ Uploads de documentos e comprovantes já possuem código e regras preparados, ma
 
 ## Papéis de acesso
 
-| Papel | Acesso principal |
+| Papel | Acesso |
 | --- | --- |
-| Administrador | Acesso completo |
-| Conselho | Mesmo acesso do Administrador |
-| Secretaria | Membros, visitantes, EBD, sociedades e relatórios |
-| Junta Diaconal | Registro e cancelamento justificado de contribuições e relatórios financeiros |
-| Professor | Chamada e relatório das classes atribuídas |
-| Líder | Sociedades atribuídas e pedidos de inclusão |
-| Acolhimento | Cadastro, consulta e contato de visitantes |
+| Conselho | Acesso completo: ver e editar tudo, convidar e aprovar usuários, definir papéis |
+| Secretaria | Mesmo acesso do Conselho; a diferença é só o nome, para organização |
+| Diácono | Lança dízimos, ofertas e missões e consulta o financeiro. Não cancela lançamentos e não acessa Relatórios |
+| Professor | Apenas a própria sala da Escola Dominical: chamada e acompanhamento dos alunos |
+| Acolhimento | Apenas a aba Visitantes: cadastro, consulta e mensagem de contato |
+| Líder de sociedade | Em espera: o módulo Sociedades está oculto e o papel não é oferecido nos convites |
+
+O papel antigo **Administrador** foi substituído pelo Conselho. Contas que ainda o têm mantêm acesso total até serem convertidas em Configurações > "Converter para Conselho".
 
 Itens sem permissão não aparecem na interface. As regras do Firestore repetem a autorização no banco; esconder um botão não é tratado como controle de segurança.
 

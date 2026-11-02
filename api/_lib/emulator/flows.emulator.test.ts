@@ -134,7 +134,7 @@ describe('financeiro da Junta Diaconal', () => {
   })
 
   it('perfis fora do financeiro são recusados', async () => {
-    for (const role of ['secretaria', 'professor', 'lider', 'acolhimento'] as const) await expectApiError(run(batch(), actorFor([role])), 'permission_denied', 403)
+    for (const role of ['professor', 'lider', 'acolhimento'] as const) await expectApiError(run(batch(), actorFor([role])), 'permission_denied', 403)
   })
 
   it('só quem criou o lote o finaliza; depois ele fica imutável', async () => {
@@ -163,9 +163,13 @@ describe('financeiro da Junta Diaconal', () => {
     await run({ type: 'finance.batch.finalize', batchId: 'batch-1' }, diacono)
 
     expect(mutationSchema.safeParse({ type: 'finance.entry.cancel', entryId: 'batch-1_i1', reason: 'x' }).success).toBe(false)
-    await run({ type: 'finance.entry.cancel', entryId: 'batch-1_i1', reason: 'Lançado em duplicidade' }, outroDiacono)
-    expect((await db.collection('financeEntries').doc('batch-1_i1').get()).data()).toMatchObject({ status: 'cancelado', cancellationReason: 'Lançado em duplicidade', cancelledBy: 'diacono-2', amount: 150.5 })
-    await expectApiError(run({ type: 'finance.entry.cancel', entryId: 'batch-1_i1', reason: 'Lançado em duplicidade' }, diacono), 'finance_entry_cancelled', 409)
+    const cancel = { type: 'finance.entry.cancel', entryId: 'batch-1_i1', reason: 'Lançado em duplicidade' }
+    await expectApiError(run(cancel, diacono), 'permission_denied', 403)
+    await expectApiError(run(cancel, outroDiacono), 'permission_denied', 403)
+
+    await run(cancel, actorFor(['secretaria'], { id: 'secretaria-1', name: 'Secretaria Um' }))
+    expect((await db.collection('financeEntries').doc('batch-1_i1').get()).data()).toMatchObject({ status: 'cancelado', cancellationReason: 'Lançado em duplicidade', cancelledBy: 'secretaria-1', amount: 150.5 })
+    await expectApiError(run(cancel, actorFor(['conselho'])), 'finance_entry_cancelled', 409)
     expect(await actions()).toEqual(expect.arrayContaining(['financeiro.lote_finalizado', 'financeiro.contribuicao_cancelada']))
   })
 })
@@ -195,8 +199,27 @@ describe('aprovação e governança de acessos', () => {
     expect(await actions()).toContain('usuario.aprovado')
   })
 
-  it('só Conselho e Administração aprovam', async () => {
-    for (const role of ['secretaria', 'diacono', 'professor', 'lider', 'acolhimento'] as const) await expectApiError(run(approve(), actorFor([role])), 'permission_denied', 403)
+  it('só Conselho e Secretaria aprovam acessos', async () => {
+    for (const role of ['diacono', 'professor', 'lider', 'acolhimento'] as const) await expectApiError(run(approve(), actorFor([role])), 'permission_denied', 403)
+    await run(approve(), actorFor(['secretaria'], { id: 'secretaria-1' }))
+    expect((await db.collection('users').doc('novo').get()).data()?.status).toBe('ativo')
+  })
+
+  it('não concede o papel antigo Administrador nem o Líder de sociedade', () => {
+    expect(mutationSchema.safeParse(approve({ roles: ['administrador'] })).success).toBe(false)
+    expect(mutationSchema.safeParse(approve({ roles: ['lider'] })).success).toBe(false)
+  })
+
+  it('converte as contas Administrador (antigo) para Conselho', async () => {
+    await seedUser(db, 'legado-1', { roles: ['administrador'], office: 'Administrador' })
+    await seedUser(db, 'legado-2', { roles: ['administrador', 'conselho', 'professor'] })
+    await run({ type: 'admins.migrate' }, conselho)
+
+    expect((await db.collection('users').doc('legado-1').get()).data()).toMatchObject({ roles: ['conselho'], office: 'Conselho' })
+    expect((await db.collection('users').doc('legado-2').get()).data()?.roles).toEqual(['conselho', 'professor'])
+    expect((await db.collection('users').doc('su-1').get()).data()?.roles).toEqual(['conselho'])
+    expect(await actions()).toContain('usuarios.administradores_migrados')
+    await expectApiError(run({ type: 'admins.migrate' }, actorFor(['diacono'])), 'permission_denied', 403)
   })
 
   it('ninguém altera o próprio acesso', async () => {

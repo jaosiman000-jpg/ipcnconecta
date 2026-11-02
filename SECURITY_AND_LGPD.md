@@ -17,6 +17,7 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 - Cadastro fechado: sem convite válido para o e-mail não existe conta. Tentativas inválidas também contam no limite.
 - Limite de tentativas por janela, gravado em `rateLimits` com IP e e-mail em hash (expiram por TTL): cadastro (por IP, por e-mail e global), operações da API (por IP e por usuário).
 - O diretório de membros lido por professores e líderes contém somente membros ativos, com nome e nascimento; situação, número e tipo ficam apenas no cadastro completo.
+- Ao desativar uma conta ou recusar um pedido, as sessões do Firebase Auth são revogadas (o acesso já era negado pelo perfil; se a revogação falhar, a desativação continua valendo e o erro fica no log).
 - Backup do Firestore: recuperação pontual de 7 dias, backup diário (7 dias) e semanal (14 semanas).
 - Testes automatizados das regras do Firestore (por perfil e coleção) e das operações da API em um emulador local, executados no CI.
 

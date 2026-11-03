@@ -12,6 +12,13 @@ Este documento registra as decisões técnicas do sistema. Ele não substitui a 
 6. Papéis e escopos são cumulativos no mesmo login.
 7. Ninguém pode aprovar a própria conta, alterar os próprios papéis ou desativar a si mesmo.
 
+## Termos de Uso e Política de Privacidade
+
+- Os textos (genéricos, a serem revisados juridicamente) ficam nas páginas públicas `/termos` e `/privacidade` (`src/pages/LegalPages.tsx`), acessíveis sem login, pelo rodapé do login e por Configurações.
+- Para criar a conta, a pessoa precisa marcar a caixa "Li e aceito os Termos de Uso e a Política de Privacidade". O servidor recusa o cadastro sem esse aceite e grava no perfil a versão aceita (`privacyNoticeVersion`) e o momento (`privacyNoticeAcceptedAt`).
+- A versão está em `src/app/legal.ts` (`LEGAL_VERSION`) e em `api/_lib/signup.ts` (`PRIVACY_NOTICE_VERSION`); um teste garante que são iguais. Ao mudar os textos de forma relevante, atualize as duas e a data exibida.
+- Pendente de definição pela igreja: nome do encarregado de dados e canal de contato específico, prazos de retenção por tipo de dado e revisão jurídica final.
+
 ## Controles já aplicados
 
 - Cadastro fechado: sem convite válido para o e-mail não existe conta. Tentativas inválidas também contam no limite.

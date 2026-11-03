@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { DatabaseZap, ShieldCheck, UserRound } from 'lucide-react'
+import { DatabaseZap, FileText, ShieldCheck, UserRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../app/AuthContext'
 import { isSuperuser, ROLE_LABELS } from '../app/permissions'
 import { callSecureMutation } from '../app/secureApi'
@@ -73,6 +74,10 @@ export function SettingsPage() {
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="profile-settings-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar alterações'}</button>{saved && <span className="save-feedback" role="status">Perfil atualizado.</span>}</div>
         </form>
+      </section>
+      <section className="panel">
+        <div className="settings-heading"><span><FileText size={21} /></span><div><h2>Termos e privacidade</h2><p>Consulte as regras de uso do sistema e como os dados pessoais são tratados.</p></div></div>
+        <div className="profile-settings-actions"><Link className="button secondary" to="/termos">Termos de Uso</Link><Link className="button secondary" to="/privacidade">Política de Privacidade</Link></div>
       </section>
       {isSuperuser(currentUser) && <section className="panel">
         <div className="settings-heading"><span><DatabaseZap size={21} /></span><div><h2>Diretórios de consulta</h2><p>Recria, a partir dos cadastros de pessoas, as listas mínimas usadas por professores, líderes e diáconos. Use após atualizações de segurança ou se alguma lista parecer desatualizada.</p></div></div>

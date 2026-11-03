@@ -746,3 +746,20 @@ fieldset legend { padding: 0 6px; color: #34443d; font-size: .78rem; font-weight
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+.login-legal { margin: 18px 0 0; text-align: center; font-size: .74rem; }
+.login-legal a, .privacy-acknowledgement a { color: var(--institutional); font-weight: 750; }
+.legal-page { display: grid; min-height: 100vh; place-items: start center; padding: 32px 20px 56px; background: var(--background); }
+.legal-card { width: min(100%, 780px); padding: 36px clamp(20px, 5vw, 48px) 32px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+.legal-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 22px; color: var(--institutional); font-size: .82rem; font-weight: 750; text-decoration: none; }
+.legal-logo { display: block; width: 64px; height: 64px; margin-bottom: 18px; border-radius: 50%; object-fit: contain; }
+.legal-meta { margin-bottom: 18px; font-size: .78rem; }
+.legal-intro { padding: 14px 16px; border-left: 3px solid var(--primary); border-radius: 0 10px 10px 0; background: #f2f8f5; font-size: .9rem; }
+.legal-section { margin-top: 26px; }
+.legal-section h2 { color: var(--institutional); font-size: 1.05rem; }
+.legal-section p, .legal-section li { color: #42544c; font-size: .9rem; line-height: 1.65; }
+.legal-section ul { margin: 8px 0 0; padding-left: 1.2rem; }
+.legal-section li { margin-bottom: 6px; }
+.legal-section a { color: var(--institutional); font-weight: 750; }
+.legal-links { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--border); font-size: .8rem; font-weight: 750; }
+.legal-links a { color: var(--institutional); }

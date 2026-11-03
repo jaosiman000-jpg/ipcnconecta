@@ -10,6 +10,8 @@ const VISITOR_ROLES: Role[] = [...SUPERUSER_ROLES, 'acolhimento']
 const EBD_MANAGER_ROLES: Role[] = [...MEMBER_MANAGER_ROLES]
 const SOCIETY_MANAGER_ROLES: Role[] = [...SUPERUSER_ROLES]
 const FINANCE_ROLES: Role[] = [...SUPERUSER_ROLES, 'diacono']
+/** Quem tem conta ativa com um destes papéis é oficial e entra na sala de Professores e Oficiais. */
+const OFFICER_ROLES: Role[] = ['conselho', 'secretaria', 'diacono']
 const ROLE_LABELS: Record<Role, string> = {
   conselho: 'Conselho',
   secretaria: 'Secretaria',
@@ -124,15 +126,22 @@ async function savePerson(db: Firestore, actor: Actor, input: Extract<MutationIn
     const counters = counter.data() ?? {}
     let nextEbd = Number(counters.nextEbdRegistrationNumber ?? 1)
     let nextMember = Number(counters.nextMemberNumber ?? 1)
-    const nextEbdData = item.ebd ? { ...item.ebd, registrationNumber: Number(oldEbd?.registrationNumber ?? nextEbd) } : oldEbd
+    let nextEbdData = item.ebd ? { ...item.ebd, registrationNumber: Number(oldEbd?.registrationNumber ?? nextEbd) } : oldEbd
     if (item.ebd && !oldEbd?.registrationNumber) nextEbd += 1
     const nextMembership = item.membership ? { ...item.membership, memberNumber: Number(oldMembership?.memberNumber ?? nextMember) } : oldMembership
     if (item.membership && !oldMembership?.memberNumber) nextMember += 1
 
     const classIds = [...new Set([String(oldEbd?.classId ?? ''), String(nextEbdData?.classId ?? '')].filter(Boolean))]
     const classSnapshots = await Promise.all(classIds.map((classId) => transaction.get(db.collection('ebdClasses').doc(classId))))
-    if (nextEbdData?.classId && !classSnapshots.find((snapshot) => snapshot.id === nextEbdData.classId)?.exists) {
+    if (nextEbdData?.classId && !classSnapshots.find((snapshot) => snapshot.id === nextEbdData?.classId)?.exists) {
       throw new ApiError(400, 'ebd_class_invalid', 'A classe selecionada não existe.')
+    }
+    // A sala de Professores e Oficiais é preenchida pelo sistema; ela nunca é a sala própria de alguém.
+    if (nextEbdData?.classId && classSnapshots.find((snapshot) => snapshot.id === nextEbdData?.classId)?.data()?.officersRoom) {
+      nextEbdData = { ...nextEbdData, classId: undefined, className: undefined }
+    }
+    if (!existing.exists && nextEbdData && !nextEbdData.classId && !nextEbdData.professor) {
+      throw new ApiError(400, 'ebd_class_required', 'Selecione a classe da EBD.')
     }
 
     const now = Timestamp.now()
@@ -152,10 +161,11 @@ async function savePerson(db: Firestore, actor: Actor, input: Extract<MutationIn
     else transaction.delete(db.collection('financeDirectory').doc(item.id))
     transaction.set(counterRef, { nextEbdRegistrationNumber: nextEbd, nextMemberNumber: nextMember, updatedAt: now }, { merge: true })
 
-    classSnapshots.forEach((snapshot) => {
+    classSnapshots.filter((snapshot) => !snapshot.data()?.officersRoom).forEach((snapshot) => {
       const studentIds = new Set(Array.isArray(snapshot.data()?.studentIds) ? snapshot.data()!.studentIds.map(String) : [])
       studentIds.delete(item.id)
-      if (snapshot.id === nextEbdData?.classId && nextEbdData.status === 'ativo') studentIds.add(item.id)
+      // Professor não conta como aluno da sala em que leciona: a presença dele é na sala de Professores e Oficiais.
+      if (snapshot.id === nextEbdData?.classId && nextEbdData.status === 'ativo' && !nextEbdData.professor) studentIds.add(item.id)
       transaction.set(snapshot.ref, { studentIds: [...studentIds] }, { merge: true })
     })
 
@@ -320,12 +330,16 @@ async function saveClass(db: Firestore, actor: Actor, input: Extract<MutationInp
   const item = input.item
   const userRefs = item.teacherIds.map((id) => db.collection('users').doc(id))
   const memberRefs = item.studentIds.map((id) => db.collection('people').doc(id))
-  const [teachers, students, allUsers, existing] = await Promise.all([
+  const [teachers, students, allUsers, existing, officersRooms] = await Promise.all([
     userRefs.length ? db.getAll(...userRefs) : [],
     memberRefs.length ? db.getAll(...memberRefs) : [],
     db.collection('users').get(),
     db.collection('ebdClasses').doc(item.id).get(),
+    db.collection('ebdClasses').where('officersRoom', '==', true).get(),
   ])
+  if (item.officersRoom && officersRooms.docs.some((entry) => entry.id !== item.id)) {
+    throw new ApiError(409, 'officers_room_exists', 'Já existe uma sala automática de Professores e Oficiais.')
+  }
   const existingStudents = existing.exists && Array.isArray(existing.data()?.studentIds) ? existing.data()!.studentIds.map(String).sort() : []
   if (JSON.stringify([...item.studentIds].sort()) !== JSON.stringify(existingStudents)) {
     throw new ApiError(403, 'student_assignment_denied', 'As matrículas devem ser alteradas pelo cadastro da pessoa.')
@@ -339,7 +353,7 @@ async function saveClass(db: Firestore, actor: Actor, input: Extract<MutationInp
   if (allUsers.size > 400) throw new ApiError(409, 'user_limit', 'A atualização excede o limite seguro de usuários.')
 
   const batch = db.batch()
-  batch.set(db.collection('ebdClasses').doc(item.id), clean(item))
+  batch.set(db.collection('ebdClasses').doc(item.id), clean({ ...item, officersRoom: item.officersRoom ? true : undefined }))
   allUsers.docs.forEach((user) => {
     const current: string[] = Array.isArray(user.data().classIds) ? (user.data().classIds as unknown[]).map(String) : []
     const next = current.filter((id) => id !== item.id)
@@ -866,14 +880,75 @@ async function rebuildDirectories(db: Firestore, actor: Actor) {
     await batch.commit()
   }
 
-  const result = { action: 'diretorios.reconstruidos', detail: `${writes.length} registro(s) conferidos`, targetId: 'directories' }
+  const rosters = await syncRosters(db, { personalClasses: true })
+  const result = { action: 'diretorios.reconstruidos', detail: `${writes.length} registro(s) conferidos; ${rosters} lista(s) de classe ajustada(s)`, targetId: 'directories' }
   const audit = db.batch()
   addAudit(audit, db, actor, result)
   await audit.commit()
   return result
 }
 
+/**
+ * Recalcula as listas de alunos das classes a partir dos cadastros.
+ * - Sala de Professores e Oficiais (`officersRoom`): pessoas ativas marcadas como professor da EBD e pessoas ligadas a uma
+ *   conta ativa de Conselho, Secretaria ou Diácono. Sempre automática, sem exceção.
+ * - Demais classes (somente com `personalClasses`): quem tem a classe como sala própria, exceto professores.
+ * Devolve quantas listas foram alteradas.
+ */
+async function syncRosters(db: Firestore, options: { personalClasses: boolean }) {
+  const [classes, people, users] = await Promise.all([
+    db.collection('ebdClasses').get(),
+    db.collection('people').get(),
+    db.collection('users').get(),
+  ])
+  const officerAccounts = new Set<string>()
+  users.docs.forEach((entry) => {
+    const data = entry.data()
+    if (data.status === 'ativo' && typeof data.personId === 'string' && profileRoles(data).some((role) => OFFICER_ROLES.includes(role as Role))) officerAccounts.add(data.personId)
+  })
+
+  const officers = new Set<string>()
+  const byClass = new Map<string, Set<string>>()
+  people.docs.forEach((entry) => {
+    const data = entry.data()
+    const ebd = data.ebd as { status?: string; professor?: boolean; classId?: string } | undefined
+    if (data.status === 'ativo' && ((ebd?.professor === true && ebd.status === 'ativo') || officerAccounts.has(entry.id))) officers.add(entry.id)
+    if (ebd?.status === 'ativo' && ebd.classId && !ebd.professor) {
+      if (!byClass.has(ebd.classId)) byClass.set(ebd.classId, new Set())
+      byClass.get(ebd.classId)!.add(entry.id)
+    }
+  })
+
+  let changed = 0
+  for (const entry of classes.docs) {
+    const target = entry.data().officersRoom ? officers : options.personalClasses ? byClass.get(entry.id) ?? new Set<string>() : undefined
+    if (!target) continue
+    const current = Array.isArray(entry.data().studentIds) ? (entry.data().studentIds as unknown[]).map(String) : []
+    const next = [...target].sort()
+    if (JSON.stringify([...current].sort()) === JSON.stringify(next)) continue
+    await entry.ref.update({ studentIds: next })
+    changed += 1
+  }
+  return changed
+}
+
+/** Mutações que mudam quem é professor ou oficial e, por isso, exigem recalcular a sala de Professores e Oficiais. */
+const ROSTER_TRIGGERS = new Set<MutationInput['type']>(['person.save', 'people.import', 'user.access.save', 'user.person.link', 'user.access.reject', 'user.access.toggle', 'ebd.class.save'])
+
 export async function executeMutation(input: MutationInput, actor: Actor, services: AdminServices) {
+  const result = await runMutation(input, actor, services)
+  if (ROSTER_TRIGGERS.has(input.type)) {
+    // A mutação já foi gravada; se o recálculo falhar, a sala se acerta na próxima alteração ou em "Reconstruir diretórios".
+    try {
+      await syncRosters(services.db, { personalClasses: input.type === 'ebd.class.save' })
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'roster_sync_failed', type: input.type, errorCode: errorCode(error) }))
+    }
+  }
+  return result
+}
+
+async function runMutation(input: MutationInput, actor: Actor, services: AdminServices) {
   const { db, auth } = services
   switch (input.type) {
     case 'person.save': return savePerson(db, actor, input)

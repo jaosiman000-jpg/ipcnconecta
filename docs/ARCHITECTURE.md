@@ -37,7 +37,7 @@ flowchart LR
 - `memberDirectory`: diretório mínimo (nome e nascimento) dos membros ativos, para os fluxos das sociedades. Pode ser recriado a partir de `people` em Configurações.
 - `memberPrivate`: observações e documentos pastorais restritos.
 - `visitors`: cadastro e acompanhamento de visitantes.
-- `ebdClasses` e `attendance`: classes e chamadas da EBD.
+- `ebdClasses` e `attendance`: classes e chamadas da EBD. A classe com `officersRoom: true` (Professores e Oficiais, uma só) tem `studentIds` recalculado pelo servidor após cada mudança em cadastros, contas e classes (`syncRosters`); a função `directories.rebuild` (sem botão na tela) refaz todas as listas.
 - `societies` e `societyRequests`: sociedades e pedidos de inclusão.
 - `ebdDirectory`: diretório mínimo dos alunos, consultado por professores somente nas classes atribuídas.
 - `financeDirectory`: diretório mínimo de contribuintes disponível para o Diácono.

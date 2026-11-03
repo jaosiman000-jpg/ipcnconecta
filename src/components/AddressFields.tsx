@@ -66,14 +66,14 @@ export function AddressFields({ initial }: { initial?: Person['address'] }) {
     <>
       <Field label="CEP">
         <span className="cep-input">
-          <input name="postalCode" value={cep} onChange={(event) => changeCep(event.target.value)} inputMode="numeric" autoComplete="postal-code" placeholder="00000-000" maxLength={9} />
+          <input name="postalCode" value={cep} onChange={(event) => changeCep(event.target.value)} inputMode="numeric" autoComplete="postal-code" maxLength={9} />
           <span className={`cep-icon ${state}`} title={MESSAGES[state] || undefined} aria-hidden="true">{state === 'searching' ? <LoaderCircle size={19} /> : <Search size={19} />}</span>
           <span className="sr-only" role="status" aria-live="polite">{MESSAGES[state]}</span>
         </span>
       </Field>
       <Field label="Rua"><input name="street" value={street} onChange={(event) => setStreet(event.target.value)} autoComplete="address-line1" /></Field>
-      <Field label="Número"><input name="number" ref={numberRef} defaultValue={current.number} maxLength={20} placeholder="Ex.: 61 ou S/N" autoComplete="off" /></Field>
-      <Field label="Complemento" hint="Se houver: apartamento, bloco, casa…"><input name="complement" defaultValue={current.complement} maxLength={80} autoComplete="off" /></Field>
+      <Field label="Número"><input name="number" ref={numberRef} defaultValue={current.number} maxLength={20} autoComplete="off" /></Field>
+      <Field label="Complemento"><input name="complement" defaultValue={current.complement} maxLength={80} autoComplete="off" /></Field>
       <Field label="Bairro"><input name="neighborhood" value={neighborhood} onChange={(event) => setNeighborhood(event.target.value)} /></Field>
       <Field label="Cidade"><input name="city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" /></Field>
     </>

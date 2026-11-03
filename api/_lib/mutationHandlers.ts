@@ -170,7 +170,8 @@ async function savePerson(db: Firestore, actor: Actor, input: Extract<MutationIn
     })
 
     if (nextMembership) {
-      const address = [item.address?.street, item.address?.numberComplement, item.address?.neighborhood, item.address?.city, item.address?.postalCode].filter(Boolean).join(', ')
+      const numberAndComplement = [item.address?.number, item.address?.complement].filter(Boolean).join(' - ') || item.address?.numberComplement
+      const address = [item.address?.street, numberAndComplement, item.address?.neighborhood, item.address?.city, item.address?.postalCode].filter(Boolean).join(', ')
       const memberData = clean({
         id: item.id,
         name: item.name,

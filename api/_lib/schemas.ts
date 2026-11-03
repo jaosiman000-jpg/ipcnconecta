@@ -12,6 +12,9 @@ const ids = z.array(id).max(500).refine((items) => new Set(items).size === items
 
 const personAddress = z.object({
   street: optionalText(160),
+  number: optionalText(20),
+  complement: optionalText(80),
+  // Formato antigo, aceito para cadastros existentes e para telas ainda não atualizadas.
   numberComplement: optionalText(80),
   neighborhood: optionalText(100),
   city: optionalText(100),

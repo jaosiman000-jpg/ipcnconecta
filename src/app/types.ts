@@ -151,6 +151,9 @@ export interface Person {
   sex?: PersonSex
   address?: {
     street?: string
+    number?: string
+    complement?: string
+    /** Formato antigo (número e complemento juntos); só leitura, substituído ao salvar. */
     numberComplement?: string
     neighborhood?: string
     city?: string

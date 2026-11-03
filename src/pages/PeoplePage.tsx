@@ -90,7 +90,8 @@ export function PeoplePage() {
     const base = editing ? personInput(editing) : { id: makeId('person'), name: '', tither: false, status: 'ativo' as const, source: 'manual' as const }
     const address = {
       street: String(form.get('street')).trim() || undefined,
-      numberComplement: String(form.get('numberComplement')).trim() || undefined,
+      number: String(form.get('number')).trim() || undefined,
+      complement: String(form.get('complement')).trim() || undefined,
       neighborhood: String(form.get('neighborhood')).trim() || undefined,
       city: String(form.get('city')).trim() || undefined,
       postalCode: String(form.get('postalCode')).trim() || undefined,

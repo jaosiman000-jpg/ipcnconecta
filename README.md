@@ -22,7 +22,7 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Cadastro somente por convite: o Conselho ou a Administração convida o e-mail, a pessoa cria a conta e a aprovação final continua manual.
 - Limite de tentativas no cadastro e nas operações da API.
 - Papéis cumulativos no mesmo login.
-- Cadastro unificado de pessoas com vínculos independentes de membro, EBD e dízimos. O endereço é preenchido sozinho ao digitar o CEP (consulta à BrasilAPI direto do navegador; só o CEP é enviado e o preenchimento manual continua disponível).
+- Cadastro unificado de pessoas com vínculos independentes de membro, EBD e dízimos. O endereço (número e complemento em campos separados) é preenchido sozinho ao digitar o CEP (consulta à BrasilAPI direto do navegador; só o CEP é enviado e o preenchimento manual continua disponível).
 - Vinculação única entre a conta de login e o cadastro da pessoa, exigida durante a aprovação.
 - Matrícula da EBD e número de membro gerados separadamente pelo servidor.
 - Área pastoral restrita ao Conselho e Administração.

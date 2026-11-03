@@ -54,6 +54,28 @@ describe('cadastro de pessoas e diretórios', () => {
     expect((await db.collection('memberDirectory').doc('person-1').get()).exists).toBe(true)
   })
 
+  it('guarda número e complemento separados e monta o endereço em texto do membro', async () => {
+    await run({ type: 'person.save', person: person({ address: { street: 'Rua das Flores', number: '61', complement: 'apto 2', neighborhood: 'Centro', city: 'Belo Horizonte', postalCode: '30130-010' } }) }, conselho)
+
+    expect((await db.collection('people').doc('person-1').get()).data()?.address).toMatchObject({ number: '61', complement: 'apto 2' })
+    expect((await db.collection('members').doc('person-1').get()).data()?.address).toBe('Rua das Flores, 61 - apto 2, Centro, Belo Horizonte, 30130-010')
+  })
+
+  it('só o número também funciona, sem hífen sobrando', async () => {
+    await run({ type: 'person.save', person: person({ address: { street: 'Rua das Flores', number: '61' } }) }, conselho)
+    expect((await db.collection('members').doc('person-1').get()).data()?.address).toBe('Rua das Flores, 61')
+  })
+
+  it('aceita o formato antigo e o substitui quando o cadastro é salvo de novo', async () => {
+    await run({ type: 'person.save', person: person({ address: { street: 'Rua das Flores', numberComplement: '61 apto 2' } }) }, conselho)
+    expect((await db.collection('members').doc('person-1').get()).data()?.address).toBe('Rua das Flores, 61 apto 2')
+
+    await run({ type: 'person.save', person: person({ address: { street: 'Rua das Flores', number: '61', complement: 'apto 2' } }) }, conselho)
+    const saved = (await db.collection('people').doc('person-1').get()).data()?.address
+    expect(saved).toMatchObject({ number: '61', complement: 'apto 2' })
+    expect(saved.numberComplement).toBeUndefined()
+  })
+
   it('o papel extinto Administrador não dá mais acesso', async () => {
     await expectApiError(run({ type: 'person.save', person: person() }, actorFor(['administrador' as never], { id: 'admin-legado' })), 'permission_denied', 403)
   })

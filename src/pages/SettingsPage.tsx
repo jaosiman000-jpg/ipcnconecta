@@ -1,9 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { DatabaseZap, FileText, ShieldCheck, UserRound } from 'lucide-react'
+import { FileText, ShieldCheck, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../app/AuthContext'
-import { isSuperuser, ROLE_LABELS } from '../app/permissions'
-import { callSecureMutation } from '../app/secureApi'
+import { ROLE_LABELS } from '../app/permissions'
 import { createProfileThumbnail, type ProfilePhotoSelection } from '../app/profilePhoto'
 import { Field, PageHeader } from '../components/Common'
 import { ProfilePhotoField } from '../components/ProfilePhotoField'
@@ -15,7 +14,6 @@ export function SettingsPage() {
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
-  const [rebuildState, setRebuildState] = useState<'idle' | 'running' | 'done' | string>('idle')
 
   useEffect(() => {
     if (currentUser) setName(currentUser.name)
@@ -44,16 +42,6 @@ export function SettingsPage() {
     }
   }
 
-  async function rebuildDirectories() {
-    setRebuildState('running')
-    try {
-      await callSecureMutation({ type: 'directories.rebuild' })
-      setRebuildState('done')
-    } catch (rebuildError) {
-      setRebuildState(rebuildError instanceof Error ? rebuildError.message : 'Não foi possível concluir a operação.')
-    }
-  }
-
   return (
     <div className="page">
       <PageHeader eyebrow="Conta" title="Configurações" description="Atualize seus dados pessoais e consulte os acessos liberados para sua conta." />
@@ -75,14 +63,10 @@ export function SettingsPage() {
           <div className="profile-settings-actions"><button className="button primary" type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar alterações'}</button>{saved && <span className="save-feedback" role="status">Perfil atualizado.</span>}</div>
         </form>
       </section>
-      <section className="panel">
+      <section className="panel profile-settings-panel">
         <div className="settings-heading"><span><FileText size={21} /></span><div><h2>Termos e privacidade</h2><p>Consulte as regras de uso do sistema e como os dados pessoais são tratados.</p></div></div>
         <div className="profile-settings-actions"><Link className="button secondary" to="/termos">Termos de Uso</Link><Link className="button secondary" to="/privacidade">Política de Privacidade</Link></div>
       </section>
-      {isSuperuser(currentUser) && <section className="panel">
-        <div className="settings-heading"><span><DatabaseZap size={21} /></span><div><h2>Diretórios de consulta</h2><p>Recria, a partir dos cadastros de pessoas, as listas mínimas usadas por professores, líderes e diáconos. Use após atualizações de segurança ou se alguma lista parecer desatualizada.</p></div></div>
-        <div className="profile-settings-actions"><button className="button secondary" type="button" onClick={rebuildDirectories} disabled={rebuildState === 'running'}>{rebuildState === 'running' ? 'Reconstruindo…' : 'Reconstruir diretórios'}</button>{rebuildState === 'done' && <span className="save-feedback" role="status">Diretórios atualizados.</span>}{rebuildState !== 'idle' && rebuildState !== 'running' && rebuildState !== 'done' && <p className="form-error" role="alert">{rebuildState}</p>}</div>
-      </section>}
     </div>
   )
 }

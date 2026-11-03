@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
 import { browserLocalPersistence, browserSessionPersistence, connectAuthEmulator, getAuth, setPersistence } from 'firebase/auth'
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
+import { connectFirestoreEmulator, getFirestore, initializeFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -17,7 +17,17 @@ export const firebaseConfigured = Object.values(firebaseConfig).every(Boolean)
 const app = firebaseConfigured ? (getApps().length ? getApp() : initializeApp(firebaseConfig)) : null
 
 export const firebaseAuth = app ? getAuth(app) : null
-export const firestore = app ? getFirestore(app) : null
+// A detecção automática de long polling evita conexões presas em redes de celular ou proxies que bloqueiam o canal em tempo real.
+function createFirestore() {
+  if (!app) return null
+  try {
+    return initializeFirestore(app, { experimentalAutoDetectLongPolling: true })
+  } catch {
+    return getFirestore(app)
+  }
+}
+
+export const firestore = createFirestore()
 export const firebaseStorage = app ? getStorage(app) : null
 
 // `npm run dev:emulator` usa um projeto de demonstração local, sem tocar nos dados reais.

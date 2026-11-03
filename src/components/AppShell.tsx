@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useApp } from '../app/AppContext'
 import { useAuth } from '../app/AuthContext'
 import { hasCapability, ROLE_LABELS, type Capability } from '../app/permissions'
 
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
 ]
 
 export function AppShell() {
+  const { status, reload } = useApp()
   const { currentUser, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
@@ -74,7 +76,10 @@ export function AppShell() {
           <div className="mobile-brand"><img src="/icons/ipcn-192.png?v=3" alt="" /><strong>IPCN Conecta</strong></div>
           <div className={`connection ${online ? 'online' : 'offline'}`} role="status" aria-label={online ? 'Online' : 'Offline'}><span />{!online && 'Offline'}</div>
         </header>
-        <main><Outlet /></main>
+        <main>
+          {(status.slow || status.failed) && <div className="data-banner" role="status"><span>{status.failed ? 'Não foi possível carregar todos os dados.' : 'Os dados estão demorando para carregar. Confira sua conexão.'}</span><button type="button" className="button secondary small" onClick={reload}>Tentar de novo</button></div>}
+          {status.loading ? <div className="data-loading" role="status">Carregando dados…</div> : <Outlet />}
+        </main>
       </div>
     </div>
   )

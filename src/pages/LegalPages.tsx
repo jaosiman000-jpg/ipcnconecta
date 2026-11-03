@@ -142,7 +142,8 @@ export function PrivacyPage() {
         <p>A igreja não vende nem repassa dados pessoais para terceiros com fins comerciais. Para que o sistema funcione, são usados serviços de tecnologia contratados, que atuam como operadores e tratam os dados apenas para essa finalidade:</p>
         <ul>
           <li>Google (Firebase), para login e armazenamento do banco de dados e das cópias de segurança;</li>
-          <li>Vercel, para a hospedagem do sistema.</li>
+          <li>Vercel, para a hospedagem do sistema;</li>
+          <li>BrasilAPI, serviço público de consulta de CEP: ao digitar um CEP no cadastro, o navegador envia a ele apenas o número do CEP (sem nome ou qualquer outro dado) para trazer rua, bairro e cidade.</li>
         </ul>
         <p>O banco de dados do sistema fica em servidores no Brasil (região de São Paulo). Esses provedores podem, em situações específicas, tratar informações também fora do país, como os dados de login, sempre com as garantias de segurança que oferecem aos seus clientes. Dados também podem ser fornecidos a autoridades quando a lei exigir.</p>
       </Section>

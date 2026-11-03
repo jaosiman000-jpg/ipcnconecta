@@ -770,5 +770,11 @@ fieldset legend { padding: 0 6px; color: #34443d; font-size: .78rem; font-weight
 .data-banner small { flex-basis: 100%; color: #8a6d1f; font-weight: 500; }
 .data-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 16px clamp(16px, 3vw, 36px) 0; padding: 11px 14px; border: 1px solid #ecd9a4; border-radius: 10px; color: #6f4e00; background: #fff8e1; font-size: .82rem; font-weight: 650; }
 
-.address-cep small { min-height: 1.1em; }
-.field small.address-warning { color: var(--warning); }
+.cep-input { position: relative; display: block; }
+.cep-input input { width: 100%; height: 43px; min-height: 43px; padding-right: 44px; }
+.cep-icon { position: absolute; top: 50%; right: 14px; display: grid; place-items: center; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
+.cep-icon.searching { color: var(--primary); }
+.cep-icon.searching svg { animation: cep-spin .8s linear infinite; }
+.cep-icon.not_found, .cep-icon.error { color: var(--warning); }
+@keyframes cep-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cep-icon.searching svg { animation-duration: 2s; } }

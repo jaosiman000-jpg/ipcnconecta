@@ -77,7 +77,7 @@ export function AppShell() {
           <div className={`connection ${online ? 'online' : 'offline'}`} role="status" aria-label={online ? 'Online' : 'Offline'}><span />{!online && 'Offline'}</div>
         </header>
         <main>
-          {(status.slow || status.failed) && <div className="data-banner" role="status"><span>{status.failed ? 'Não foi possível carregar todos os dados.' : 'Os dados estão demorando para carregar. Confira sua conexão.'}</span><button type="button" className="button secondary small" onClick={reload}>Tentar de novo</button></div>}
+          {(status.slow || status.failed) && <div className="data-banner" role="status"><span>{status.failed ? 'Não foi possível carregar todos os dados.' : 'Os dados estão demorando para carregar. Confira sua conexão.'}</span><button type="button" className="button secondary small" onClick={reload}>Tentar de novo</button>{status.failed && status.details.length > 0 && <small>Detalhe técnico: {status.details.join('; ')}</small>}</div>}
           {status.loading ? <div className="data-loading" role="status">Carregando dados…</div> : <Outlet />}
         </main>
       </div>

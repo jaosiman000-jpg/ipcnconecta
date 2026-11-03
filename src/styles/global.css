@@ -765,5 +765,6 @@ fieldset legend { padding: 0 6px; color: #34443d; font-size: .78rem; font-weight
 .legal-links a { color: var(--institutional); }
 
 .data-loading { display: grid; min-height: 40vh; place-items: center; color: var(--muted); font-weight: 700; }
+.data-banner small { flex-basis: 100%; color: #8a6d1f; font-weight: 500; }
 .data-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 16px clamp(16px, 3vw, 36px) 0; padding: 11px 14px; border: 1px solid #ecd9a4; border-radius: 10px; color: #6f4e00; background: #fff8e1; font-size: .82rem; font-weight: 650; }
 .maintenance-panel summary { padding: 14px 20px; cursor: pointer; color: var(--muted); font-size: .82rem; font-weight: 750; }

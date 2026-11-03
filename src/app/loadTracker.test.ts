@@ -12,17 +12,17 @@ describe('acompanhamento do carregamento', () => {
     const { tracker, last } = setup()
     const a = tracker.add()
     const b = tracker.add()
-    expect(last()).toEqual({ loading: true, failed: false })
+    expect(last()).toEqual({ loading: true, failed: false, details: [] })
     a.loaded()
     expect(last().loading).toBe(true)
     b.loaded()
-    expect(last()).toEqual({ loading: false, failed: false })
+    expect(last()).toEqual({ loading: false, failed: false, details: [] })
   })
 
   it('leitura opcional não segura a tela', () => {
     const { tracker, last } = setup()
     const optional = tracker.add({ optional: true })
-    expect(last()).toEqual({ loading: false, failed: false })
+    expect(last()).toEqual({ loading: false, failed: false, details: [] })
     optional.loaded()
     expect(last().loading).toBe(false)
   })
@@ -31,21 +31,21 @@ describe('acompanhamento do carregamento', () => {
     const { tracker, last } = setup()
     const a = tracker.add()
     a.failed()
-    expect(last()).toEqual({ loading: false, failed: true })
+    expect(last()).toEqual({ loading: false, failed: true, details: ['erro'] })
     a.loaded()
-    expect(last()).toEqual({ loading: false, failed: false })
+    expect(last()).toEqual({ loading: false, failed: false, details: [] })
   })
 
   it('falha de leitura opcional também é avisada', () => {
     const { tracker, last } = setup()
-    tracker.add({ optional: true }).failed()
-    expect(last()).toEqual({ loading: false, failed: true })
+    tracker.add({ optional: true, label: 'auditoria' }).failed('permission-denied')
+    expect(last()).toEqual({ loading: false, failed: true, details: ['auditoria: permission-denied'] })
   })
 
   it('sem nenhuma leitura registrada, a conferência final libera a tela', () => {
     const { tracker, last } = setup()
     tracker.refresh()
-    expect(last()).toEqual({ loading: false, failed: false })
+    expect(last()).toEqual({ loading: false, failed: false, details: [] })
   })
 
   it('respostas repetidas não desequilibram a contagem', () => {
@@ -56,7 +56,7 @@ describe('acompanhamento do carregamento', () => {
     a.failed()
     a.failed()
     a.loaded()
-    expect(last()).toEqual({ loading: false, failed: false })
+    expect(last()).toEqual({ loading: false, failed: false, details: [] })
     tracker.add()
     expect(last().loading).toBe(true)
   })

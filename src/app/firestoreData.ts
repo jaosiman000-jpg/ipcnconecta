@@ -88,7 +88,7 @@ function subscribeQueries<T>(queries: Query<DocumentData>[], receive: (items: T[
       if (stopped) return
       const delay = RETRY_DELAYS[attempts[index]]
       if (delay === undefined) {
-        watch?.failed()
+        watch?.failed(error.code)
         return
       }
       attempts[index] += 1
@@ -119,7 +119,7 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
   if (!firestore) return () => undefined
   const db = firestore
   // Cada leitura é registrada no acompanhamento: a tela sabe quando os dados chegaram ou falharam.
-  const watched = <T,>(queries: Query<DocumentData>[], onItems: (items: T[]) => void, options?: { optional?: boolean }) =>
+  const watched = <T,>(queries: Query<DocumentData>[], onItems: (items: T[]) => void, options?: { optional?: boolean; label?: string }) =>
     subscribeQueries<T>(queries, onItems, tracker?.add(options))
   const stops: Unsubscribe[] = []
   let publicMembers: Member[] = []
@@ -129,12 +129,12 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
   const canReadFullMembers = hasCapability(user, 'members.view')
   const needsMemberDirectory = hasCapability(user, 'societies.view')
   if (canReadFullMembers) {
-    stops.push(watched<Member>([fullCollection('members')], (items) => { publicMembers = items; emitMembers() }))
+    stops.push(watched<Member>([fullCollection('members')], (items) => { publicMembers = items; emitMembers() }, { label: 'membros' }))
     if (isSuperuser(user)) {
       stops.push(watched<Pick<Member, 'id' | 'restrictedNotes' | 'documents'>>([fullCollection('memberPrivate')], (items) => {
         privateMembers = new Map(items.map((item) => [item.id, { restrictedNotes: item.restrictedNotes, documents: item.documents ?? [] }]))
         emitMembers()
-      }, { optional: true }))
+      }, { optional: true, label: 'anotações de membros' }))
     }
   } else if (needsMemberDirectory) {
     // O diretório só contém membros ativos e não traz a situação; ela é preenchida aqui.
@@ -142,7 +142,7 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
   } else receive({ members: [] })
 
   if (hasCapability(user, 'people.view')) {
-    stops.push(watched([fullCollection('people')], (items: AppData['people']) => receive({ people: items })))
+    stops.push(watched([fullCollection('people')], (items: AppData['people']) => receive({ people: items }), { label: 'cadastros' }))
   } else if (hasCapability(user, 'ebd.view') || hasCapability(user, 'finance.view')) {
     let ebdPeople: AppData['people'] = []
     let financePeople: AppData['people'] = []
@@ -190,13 +190,13 @@ export function subscribeAppData(user: User, receive: (update: Partial<AppData>)
   }
 
   subscriptions.forEach(([enabled, key, queries]) => {
-    if (enabled) stops.push(watched(queries, (items) => receive({ [key]: items }), { optional: key === 'attendance' }))
+    if (enabled) stops.push(watched(queries, (items) => receive({ [key]: items }), { optional: key === 'attendance', label: key }))
     else receive({ [key]: [] })
   })
 
   if (hasCapability(user, 'audit.view')) {
     // Só os registros mais recentes: o histórico completo cresce sem parar e atrasaria a abertura do sistema.
-    stops.push(watched<AuditEntry>([query(collection(db, 'audit'), orderBy('at', 'desc'), limit(500))], (items) => receive({ audit: items.sort((a, b) => b.at.localeCompare(a.at)) }), { optional: true }))
+    stops.push(watched<AuditEntry>([query(collection(db, 'audit'), orderBy('at', 'desc'), limit(500))], (items) => receive({ audit: items.sort((a, b) => b.at.localeCompare(a.at)) }), { optional: true, label: 'auditoria' }))
   } else receive({ audit: [] })
 
   stops.push(onSnapshot(doc(firestore, 'appSettings', 'general'), (snapshot) => {

@@ -17,6 +17,8 @@ export interface DataStatus {
   slow: boolean
   /** Alguma leitura falhou mesmo após novas tentativas. */
   failed: boolean
+  /** Código técnico das leituras que falharam, para o suporte. */
+  details: string[]
 }
 
 interface AppContextValue {
@@ -35,7 +37,7 @@ export function makeId(prefix: string) {
 export function AppProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth()
   const [data, setData] = useState<AppData>(createInitialData)
-  const [load, setLoad] = useState<LoadState>({ loading: true, failed: false })
+  const [load, setLoad] = useState<LoadState>({ loading: true, failed: false, details: [] })
   const [slow, setSlow] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const reload = useCallback(() => setAttempt((value) => value + 1), [])
@@ -43,7 +45,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setData(createInitialData())
     setSlow(false)
-    setLoad({ loading: Boolean(currentUser), failed: false })
+    setLoad({ loading: Boolean(currentUser), failed: false, details: [] })
     if (!currentUser) return
     const tracker = createLoadTracker(setLoad)
     const stop = subscribeAppData(currentUser, (update) => setData((current) => ({ ...current, ...update })), tracker)
@@ -69,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser, data])
 
-  const status = useMemo<DataStatus>(() => ({ loading: load.loading && !slow, slow: slow && load.loading, failed: load.failed }), [load, slow])
+  const status = useMemo<DataStatus>(() => ({ loading: load.loading && !slow, slow: slow && load.loading, failed: load.failed, details: load.details }), [load, slow])
   const value = useMemo(() => ({ data, status, reload, updateData }), [data, status, reload, updateData])
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

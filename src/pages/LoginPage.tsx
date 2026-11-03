@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowRight, CheckCircle2, Eye, EyeOff, MailCheck, ShieldCheck } from 'lucide-react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../app/AuthContext'
 import { createProfileThumbnail, type ProfilePhotoSelection } from '../app/profilePhoto'
 import { Field, FormActions, Modal } from '../components/Common'
@@ -122,6 +122,7 @@ export function LoginPage() {
           </form>
           <button className="text-button" type="button" onClick={handlePasswordReset} disabled={busy}>Esqueci minha senha</button>
           <button className="text-button" type="button" onClick={() => { setError(''); setRequestSent(false); setRequestOpen(true) }} disabled={!configured}>Recebi um convite? Criar minha conta</button>
+          <p className="login-legal"><Link to="/termos">Termos de Uso</Link> · <Link to="/privacidade">Política de Privacidade</Link></p>
           {!configured && <div className="configuration-box"><strong>Firebase não configurado</strong><p>Adicione as variáveis do projeto para ativar o login real.</p></div>}
         </div>
       </main>
@@ -138,7 +139,7 @@ export function LoginPage() {
               <Field className="access-request-password" label="Senha" hint="Use pelo menos 8 caracteres."><input name="password" type="password" required minLength={8} maxLength={72} autoComplete="new-password" /></Field>
               <Field className="access-request-confirmation" label="Confirmar senha"><input name="passwordConfirmation" type="password" required minLength={8} maxLength={72} autoComplete="new-password" /></Field>
             </div>
-            <label className="privacy-acknowledgement"><input type="checkbox" required name="privacyNotice" /><span>Li o aviso de privacidade e estou ciente de que estes dados serão usados para analisar e administrar meu acesso ao IPCN Conecta.</span></label>
+            <label className="privacy-acknowledgement"><input type="checkbox" required name="privacyNotice" /><span>Li e aceito os <Link to="/termos" target="_blank" rel="noopener">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" rel="noopener">Política de Privacidade</Link> do IPCN Conecta, e estou ciente de que meus dados serão usados para analisar e administrar o meu acesso.</span></label>
             {error && <p className="form-error" role="alert">{error}</p>}
             <FormActions onCancel={() => setRequestOpen(false)} submitLabel={busy ? 'Enviando…' : 'Criar conta e verificar e-mail'} disabled={busy} />
           </form>

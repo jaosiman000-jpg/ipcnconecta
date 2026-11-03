@@ -8,6 +8,7 @@ import { EbdPage } from './pages/EbdPage'
 import { FinancePage } from './pages/FinancePage'
 import { ContributionWorkspacePage } from './pages/ContributionWorkspacePage'
 import { LoginPage } from './pages/LoginPage'
+import { PrivacyPage, TermsPage } from './pages/LegalPages'
 import { MembersPage } from './pages/MembersPage'
 import { PeoplePage } from './pages/PeoplePage'
 import { ReportsPage } from './pages/ReportsPage'
@@ -35,6 +36,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/termos" element={<TermsPage />} />
+      <Route path="/privacidade" element={<PrivacyPage />} />
       <Route element={<ProtectedApp />}>
         <Route index element={<Home />} />
         <Route path="membros" element={<Guard capability="members.view"><MembersPage /></Guard>} />

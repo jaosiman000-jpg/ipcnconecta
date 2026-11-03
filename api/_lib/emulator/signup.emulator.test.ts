@@ -3,7 +3,7 @@ import { Timestamp } from '@google-cloud/firestore'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { inviteIdFor } from '../invites.js'
 import { signupSchema } from '../schemas.js'
-import { registerInvitedUser } from '../signup.js'
+import { PRIVACY_NOTICE_VERSION, registerInvitedUser } from '../signup.js'
 import { clearDatabase, createDb, createFakeAuth, expectApiError, services } from './helpers.js'
 
 let db: Firestore
@@ -35,7 +35,7 @@ describe('cadastro por convite', () => {
     const profile = (await db.collection('users').doc(authUser.uid).get()).data()
     expect(profile).toMatchObject({
       uid: authUser.uid, email: 'convidado@example.com', status: 'pendente', roles: [], requestedRoles: ['professor', 'lider'],
-      emailVerified: false, classIds: [], societyIds: [], privacyNoticeVersion: '2026-10-26',
+      emailVerified: false, classIds: [], societyIds: [], privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
     })
     expect(profile?.photo).toBe('data:image/png;base64,AAAA')
     expect((await db.collection('invites').doc(inviteId).get()).data()).toMatchObject({ status: 'usado', usedBy: authUser.uid })

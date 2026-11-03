@@ -5,7 +5,8 @@ import { consumeRateLimits, signupLimits } from './rateLimit.js'
 import type { SignupInput, Role } from './schemas.js'
 import { ApiError } from './security.js'
 
-export const PRIVACY_NOTICE_VERSION = '2026-10-26'
+// Versão dos Termos de Uso e da Política de Privacidade aceitos no cadastro; igual a LEGAL_VERSION em src/app/legal.ts.
+export const PRIVACY_NOTICE_VERSION = '2026-11-03'
 
 const ROLE_LABELS: Record<Role, string> = {
   conselho: 'Conselho',

@@ -66,7 +66,7 @@ export function AddressFields({ initial }: { initial?: Person['address'] }) {
     <>
       <Field label="CEP">
         <span className="cep-input">
-          <input name="postalCode" value={cep} onChange={(event) => changeCep(event.target.value)} inputMode="numeric" autoComplete="postal-code" maxLength={9} />
+          <input name="postalCode" value={cep} onChange={(event) => changeCep(event.target.value)} inputMode="numeric" autoComplete="postal-code" placeholder="00000-000" maxLength={9} />
           <span className={`cep-icon ${state}`} title={MESSAGES[state] || undefined} aria-hidden="true">{state === 'searching' ? <LoaderCircle size={19} /> : <Search size={19} />}</span>
           <span className="sr-only" role="status" aria-live="polite">{MESSAGES[state]}</span>
         </span>

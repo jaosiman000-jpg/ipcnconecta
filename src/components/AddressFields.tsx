@@ -72,8 +72,8 @@ export function AddressFields({ initial }: { initial?: Person['address'] }) {
         </span>
       </Field>
       <Field label="Rua"><input name="street" value={street} onChange={(event) => setStreet(event.target.value)} autoComplete="address-line1" /></Field>
-      <Field label="Número"><input name="number" ref={numberRef} defaultValue={current.number} maxLength={20} placeholder="Ex.: 61 ou S/N" autoComplete="off" /></Field>
-      <Field label="Complemento" hint="Se houver: apartamento, bloco, casa…"><input name="complement" defaultValue={current.complement} maxLength={80} autoComplete="off" /></Field>
+      <Field label="Número"><input name="number" ref={numberRef} defaultValue={current.number} maxLength={20} autoComplete="off" /></Field>
+      <Field label="Complemento"><input name="complement" defaultValue={current.complement} maxLength={80} autoComplete="off" /></Field>
       <Field label="Bairro"><input name="neighborhood" value={neighborhood} onChange={(event) => setNeighborhood(event.target.value)} /></Field>
       <Field label="Cidade"><input name="city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" /></Field>
     </>

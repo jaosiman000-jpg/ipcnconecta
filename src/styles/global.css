@@ -763,3 +763,5 @@ fieldset legend { padding: 0 6px; color: #34443d; font-size: .78rem; font-weight
 .legal-section a { color: var(--institutional); font-weight: 750; }
 .legal-links { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--border); font-size: .8rem; font-weight: 750; }
 .legal-links a { color: var(--institutional); }
+
+.room-pending-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 22px 20px; }

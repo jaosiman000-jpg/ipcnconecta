@@ -28,6 +28,7 @@ As capturas usam somente a tela pública de login e não exibem dados pessoais.
 - Área pastoral restrita ao Conselho e Administração.
 - Visitantes, consentimento e contato manual pelo WhatsApp.
 - Classes, professores, alunos, chamadas aos domingos e relatórios da EBD.
+- Sala automática de Professores e Oficiais: entram sozinhos os professores marcados no cadastro e quem tem conta ativa de Conselho, Secretaria ou Diácono ligada ao cadastro. A sala própria de cada pessoa (onde leciona ou assiste aula) continua no cadastro; professor não conta como aluno dela.
 - Sociedades internas UCP, UPA, UMP, UPH e SAF.
 - Financeiro do Diácono com lotes de dízimos, ofertas e missões em dinheiro ou PIX.
 - Relatórios e exportação de planilhas.

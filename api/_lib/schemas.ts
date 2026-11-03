@@ -79,6 +79,7 @@ const ebdClass = z.object({
   teacherIds: ids,
   studentIds: ids,
   active: z.boolean(),
+  officersRoom: z.boolean().optional(),
 }).strict()
 
 const attendanceRecords = z.record(id, z.enum(['presente', 'ausente', 'justificado', 'visitante']))

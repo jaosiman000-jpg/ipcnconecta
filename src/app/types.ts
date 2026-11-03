@@ -96,6 +96,8 @@ export interface EbdClass {
   teacherIds: string[]
   studentIds: string[]
   active: boolean
+  /** Sala automática de Professores e Oficiais: a lista de presença é montada pelo sistema. */
+  officersRoom?: boolean
 }
 
 export interface AttendanceSession {
